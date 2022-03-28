@@ -29,6 +29,41 @@ const emptyLineGutter = gutter({
 	},
 });
 
+function processDrop(app, event, performOperation) {
+	const sourceLine = event.dataTransfer.getData("line");
+
+	const view = app.workspace.getActiveViewOfType(MarkdownView);
+
+	if (!view || !view.editor) return;
+
+	const sourceEditor = view.editor;
+	const targetEditor = Object.create(sourceEditor.__proto__, {
+		cm: {
+			value: event.target.cmView.editorView,
+			writable: true,
+			configurable: true,
+		},
+	});
+	const targetLine = event.target.cmView.editorView.state.doc.lineAt(
+		event.target.cmView.posAtStart
+	);
+
+	// remove source item
+	performOperation.performOperation(
+		(root) => ({
+			shouldUpdate: () => true,
+			shouldStopPropagation: () => false,
+			perform: () => {
+				const sourceList = root.getListUnderLine(sourceLine);
+				console.log(sourceLine);
+				console.log(targetLine);
+			},
+		}),
+		new MyEditor(sourceEditor),
+		sourceEditor.getCursor()
+	);
+}
+
 export default class MyPlugin extends Plugin {
 	async onload() {
 		this.logger = new LoggerService({});
@@ -57,33 +92,8 @@ export default class MyPlugin extends Plugin {
 					const target = event.target as HTMLElement;
 					target.classList.remove("drag-over");
 				},
-				drop(event) {
-					const sourceLine = event.dataTransfer.getData("line");
-
-					const view =
-						that.app.workspace.getActiveViewOfType(MarkdownView);
-					console.log(that.app.workspace);
-					if (view && view.editor) {
-						const editor = view.editor;
-						const targetLine =
-							event.target.cmView.editorView.state.doc.lineAt(
-								event.target.cmView.posAtStart
-							);
-						performOperation.performOperation(
-							(root) => ({
-								shouldUpdate: () => true,
-								shouldStopPropagation: () => false,
-								perform: () => {
-									const sourceList =
-										root.getListUnderLine(sourceLine);
-									console.log(sourceLine);
-									console.log(targetLine);
-								},
-							}),
-							new MyEditor(editor),
-							editor.getCursor()
-						);
-					}
+				drop(event, viewDrop) {
+					processDrop(that.app, event, performOperation);
 				},
 			})
 		);
