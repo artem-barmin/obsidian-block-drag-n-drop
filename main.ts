@@ -57,23 +57,27 @@ export default class MyPlugin extends Plugin {
 					const target = event.target as HTMLElement;
 					target.classList.remove("drag-over");
 				},
-				drop(event, editor) {
+				drop(event) {
 					const sourceLine = event.dataTransfer.getData("line");
 
 					const view =
 						that.app.workspace.getActiveViewOfType(MarkdownView);
+					console.log(that.app.workspace);
 					if (view && view.editor) {
 						const editor = view.editor;
-						console.log(">>>>", event);
+						const targetLine =
+							event.target.cmView.editorView.state.doc.lineAt(
+								event.target.cmView.posAtStart
+							);
 						performOperation.performOperation(
 							(root) => ({
 								shouldUpdate: () => true,
 								shouldStopPropagation: () => false,
 								perform: () => {
-									if (!root.hasSingleCursor()) return;
 									const sourceList =
 										root.getListUnderLine(sourceLine);
 									console.log(sourceLine);
+									console.log(targetLine);
 								},
 							}),
 							new MyEditor(editor),
