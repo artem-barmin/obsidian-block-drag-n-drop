@@ -1,4 +1,16 @@
 /* Sets all the text color to red! */
 body {
-    color: red;
+	color: red;
+}
+
+.gutter-marker {
+	opacity: 0;
+}
+
+.gutter-marker:hover {
+	opacity: 1;
+}
+
+.drag-over {
+	border-bottom: 2px solid black;
 }
