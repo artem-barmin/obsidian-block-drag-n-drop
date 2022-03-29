@@ -1,6 +1,7 @@
 .gutter-marker {
-	opacity: 0;
-	font-size: 30px;
+	/* opacity: 0; */
+	color: red;
+	cursor: pointer;
 }
 
 .gutter-marker:hover {

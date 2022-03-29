@@ -30,7 +30,7 @@ const emptyLineGutter = gutter({
 });
 
 function processDrop(app, event, performOperation) {
-	const sourceLine = event.dataTransfer.getData("line");
+	const sourceLine = parseInt(event.dataTransfer.getData("line"), 10);
 
 	const view = app.workspace.getActiveViewOfType(MarkdownView);
 
@@ -49,7 +49,7 @@ function processDrop(app, event, performOperation) {
 			event.target.cmView.posAtStart
 		).number - 1;
 
-	const operation = (editor, cb) =>
+	const operation = (editor, line, cb) =>
 		performOperation.performOperation(
 			(root) => ({
 				shouldUpdate: () => true,
@@ -57,11 +57,11 @@ function processDrop(app, event, performOperation) {
 				perform: () => cb(root),
 			}),
 			new MyEditor(editor),
-			{ line: 0, ch: 0 }
+			{ line, ch: 0 }
 		);
-
 	if (sourceEditor.cm === targetEditor.cm) {
-		operation(targetEditor, (root) => {
+		operation(sourceEditor, sourceLine, (root) => {
+			console.log(root);
 			const sourceItem = root.getListUnderLine(sourceLine);
 			const targetItem = root.getListUnderLine(targetLine);
 
