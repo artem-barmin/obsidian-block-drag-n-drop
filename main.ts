@@ -72,11 +72,16 @@ function processDrop(app, event, performOperation) {
 		});
 	} else {
 		let sourceItem;
-		operation(sourceEditor, (root) => {
-			sourceItem = root.getListUnderLine(sourceLine);
-			const sourceParent = sourceItem.getParent();
-			sourceParent.removeChild(sourceItem);
-		});
+		try {
+			operation(sourceEditor, (root) => {
+				sourceItem = root.getListUnderLine(sourceLine);
+				const sourceParent = sourceItem.getParent();
+				sourceParent.removeChild(sourceItem);
+			});
+		} catch (e) {
+			// when last item is dragged and file became empty - error will arrive
+			console.log(e);
+		}
 
 		operation(targetEditor, (root) => {
 			const targetItem = root.getListUnderLine(targetLine);
