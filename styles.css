@@ -1,8 +1,3 @@
-/* Sets all the text color to red! */
-body {
-	color: red;
-}
-
 .gutter-marker {
 	opacity: 0;
 	font-size: 30px;
