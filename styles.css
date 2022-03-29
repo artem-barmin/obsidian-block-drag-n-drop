@@ -5,6 +5,7 @@ body {
 
 .gutter-marker {
 	opacity: 0;
+	font-size: 30px;
 }
 
 .gutter-marker:hover {

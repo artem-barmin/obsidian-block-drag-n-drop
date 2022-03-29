@@ -25,7 +25,7 @@ const emptyLineGutter = gutter({
 	lineMarker(view, line) {
 		return line.from == line.to
 			? null
-			: emptyMarker(view.state.doc.lineAt(line.from).number);
+			: emptyMarker(view.state.doc.lineAt(line.from).number - 1);
 	},
 });
 
@@ -44,24 +44,45 @@ function processDrop(app, event, performOperation) {
 			configurable: true,
 		},
 	});
-	const targetLine = event.target.cmView.editorView.state.doc.lineAt(
-		event.target.cmView.posAtStart
-	);
+	const targetLine =
+		event.target.cmView.editorView.state.doc.lineAt(
+			event.target.cmView.posAtStart
+		).number - 1;
 
-	// remove source item
-	performOperation.performOperation(
-		(root) => ({
-			shouldUpdate: () => true,
-			shouldStopPropagation: () => false,
-			perform: () => {
-				const sourceList = root.getListUnderLine(sourceLine);
-				console.log(sourceLine);
-				console.log(targetLine);
-			},
-		}),
-		new MyEditor(sourceEditor),
-		sourceEditor.getCursor()
-	);
+	const operation = (editor, cb) =>
+		performOperation.performOperation(
+			(root) => ({
+				shouldUpdate: () => true,
+				shouldStopPropagation: () => false,
+				perform: () => cb(root),
+			}),
+			new MyEditor(editor),
+			{ line: 0, ch: 0 }
+		);
+
+	if (sourceEditor.cm === targetEditor.cm) {
+		operation(targetEditor, (root) => {
+			const sourceItem = root.getListUnderLine(sourceLine);
+			const targetItem = root.getListUnderLine(targetLine);
+
+			const sourceParent = sourceItem.getParent();
+			sourceParent.removeChild(sourceItem);
+
+			targetItem.addBeforeAll(sourceItem);
+		});
+	} else {
+		let sourceItem;
+		operation(sourceEditor, (root) => {
+			sourceItem = root.getListUnderLine(sourceLine);
+			const sourceParent = sourceItem.getParent();
+			sourceParent.removeChild(sourceItem);
+		});
+
+		operation(targetEditor, (root) => {
+			const targetItem = root.getListUnderLine(targetLine);
+			targetItem.addBeforeAll(sourceItem);
+		});
+	}
 }
 
 export default class MyPlugin extends Plugin {
