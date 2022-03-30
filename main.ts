@@ -1,11 +1,32 @@
 import { Plugin, MarkdownView } from "obsidian";
 import { gutter, GutterMarker } from "@codemirror/gutter";
 import { EditorView } from "@codemirror/view";
-import { LoggerService } from "obsidian-outliner/src/services/LoggerService";
-import { ParserService } from "obsidian-outliner/src/services/ParserService";
-import { ApplyChangesService } from "obsidian-outliner/src/services/ApplyChangesService";
-import { PerformOperationService } from "obsidian-outliner/src/services/PerformOperationService";
-import { MyEditor } from "obsidian-outliner/src/MyEditor";
+import { remark } from "remark";
+import { visit } from "unist-util-visit";
+import _ from "lodash";
+
+function findListItem(text, line) {
+	return new Promise((resolve, reject) => {
+		remark()
+			.use(() => (ast) => {
+				const allItems = [];
+				visit(ast, ["listItem"], (node, index, parent) => {
+					const start = node.position.start.line;
+					const end = node.position.end.line;
+					if (start <= line && end >= line)
+						allItems.push({
+							node,
+							parent,
+							index,
+							height: end - start,
+						});
+				});
+				resolve(_.minBy(allItems, "height"));
+				return ast;
+			})
+			.process(text, function (err, file) {});
+	});
+}
 
 const emptyMarker = (line) =>
 	new (class extends GutterMarker {
@@ -25,11 +46,11 @@ const emptyLineGutter = gutter({
 	lineMarker(view, line) {
 		return line.from == line.to
 			? null
-			: emptyMarker(view.state.doc.lineAt(line.from).number - 1);
+			: emptyMarker(view.state.doc.lineAt(line.from).number);
 	},
 });
 
-function processDrop(app, event, performOperation) {
+async function processDrop(app, event) {
 	const sourceLine = parseInt(event.dataTransfer.getData("line"), 10);
 
 	const view = app.workspace.getActiveViewOfType(MarkdownView);
@@ -37,71 +58,28 @@ function processDrop(app, event, performOperation) {
 	if (!view || !view.editor) return;
 
 	const sourceEditor = view.editor;
-	const targetEditor = Object.create(sourceEditor.__proto__, {
-		cm: {
-			value: event.target.cmView.editorView,
-			writable: true,
-			configurable: true,
-		},
-	});
-	const targetLine =
-		event.target.cmView.editorView.state.doc.lineAt(
-			event.target.cmView.posAtStart
-		).number - 1;
+	const targetEditor = event.target.cmView;
+	const targetPos = event.target.cmView.editorView.state.doc.lineAt(
+		event.target.cmView.posAtStart
+	).to;
 
-	const operation = (editor, line, cb) =>
-		performOperation.performOperation(
-			(root) => ({
-				shouldUpdate: () => true,
-				shouldStopPropagation: () => false,
-				perform: () => cb(root),
-			}),
-			new MyEditor(editor),
-			{ line, ch: 0 }
-		);
-	if (sourceEditor.cm === targetEditor.cm) {
-		operation(sourceEditor, sourceLine, (root) => {
-			console.log(root);
-			const sourceItem = root.getListUnderLine(sourceLine);
-			const targetItem = root.getListUnderLine(targetLine);
-
-			const sourceParent = sourceItem.getParent();
-			sourceParent.removeChild(sourceItem);
-
-			targetItem.addBeforeAll(sourceItem);
-		});
-	} else {
-		let sourceItem;
-		try {
-			operation(sourceEditor, (root) => {
-				sourceItem = root.getListUnderLine(sourceLine);
-				const sourceParent = sourceItem.getParent();
-				sourceParent.removeChild(sourceItem);
-			});
-		} catch (e) {
-			// when last item is dragged and file became empty - error will arrive
-			console.log(e);
-		}
-
-		operation(targetEditor, (root) => {
-			const targetItem = root.getListUnderLine(targetLine);
-			targetItem.addBeforeAll(sourceItem);
-		});
+	const text = sourceEditor.getValue();
+	const item = await findListItem(text, sourceLine);
+	if (item) {
+		const changes = [];
+		const from = item.node.position.start.offset;
+		const to = item.node.position.end.offset;
+		changes.push({ from: from - 1, to });
+		const textToInsert = text.slice(from, to);
+		changes.push({ from: targetPos, insert: "\n" + textToInsert });
+		console.log(changes);
+		sourceEditor.cm.dispatch({ changes });
 	}
 }
 
 export default class MyPlugin extends Plugin {
 	async onload() {
-		this.logger = new LoggerService({});
-
-		this.parser = new ParserService(this.logger);
-		this.applyChanges = new ApplyChangesService();
-		const performOperation = new PerformOperationService(
-			this.parser,
-			this.applyChanges
-		);
 		const that = this;
-
 		this.registerEditorExtension(emptyLineGutter);
 		this.registerEditorExtension(
 			EditorView.domEventHandlers({
@@ -119,7 +97,7 @@ export default class MyPlugin extends Plugin {
 					target.classList.remove("drag-over");
 				},
 				drop(event, viewDrop) {
-					processDrop(that.app, event, performOperation);
+					processDrop(that.app, event);
 				},
 			})
 		);
