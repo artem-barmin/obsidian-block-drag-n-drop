@@ -1,31 +1,26 @@
 import { Plugin, MarkdownView } from "obsidian";
 import { gutter, GutterMarker } from "@codemirror/gutter";
 import { EditorView } from "@codemirror/view";
-import { remark } from "remark";
+import { unified } from "unified";
+import remarkParse from "remark-parse";
 import { visit } from "unist-util-visit";
 import _ from "lodash";
 
 function findListItem(text, line) {
-	return new Promise((resolve, reject) => {
-		remark()
-			.use(() => (ast) => {
-				const allItems = [];
-				visit(ast, ["listItem"], (node, index, parent) => {
-					const start = node.position.start.line;
-					const end = node.position.end.line;
-					if (start <= line && end >= line)
-						allItems.push({
-							node,
-							parent,
-							index,
-							height: end - start,
-						});
-				});
-				resolve(_.minBy(allItems, "height"));
-				return ast;
-			})
-			.process(text, function (err, file) {});
+	const ast = unified().use(remarkParse).parse(text);
+	const allItems = [];
+	visit(ast, ["listItem"], (node, index, parent) => {
+		const start = node.position.start.line;
+		const end = node.position.end.line;
+		if (start <= line && end >= line)
+			allItems.push({
+				node,
+				parent,
+				index,
+				height: end - start,
+			});
 	});
+	return _.minBy(allItems, "height");
 }
 
 const emptyMarker = (line) =>
@@ -50,7 +45,7 @@ const emptyLineGutter = gutter({
 	},
 });
 
-async function processDrop(app, event) {
+function processDrop(app, event) {
 	const sourceLine = parseInt(event.dataTransfer.getData("line"), 10);
 
 	const view = app.workspace.getActiveViewOfType(MarkdownView);
@@ -64,7 +59,7 @@ async function processDrop(app, event) {
 	).to;
 
 	const text = sourceEditor.getValue();
-	const item = await findListItem(text, sourceLine);
+	const item = findListItem(text, sourceLine);
 	if (item) {
 		const changes = [];
 		const from = item.node.position.start.offset;

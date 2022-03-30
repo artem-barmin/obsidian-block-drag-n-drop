@@ -24,6 +24,7 @@
 	},
 	"dependencies": {
 		"lodash": "^4.17.21",
-		"remark": "^14.0.2"
+		"remark-parse": "^10.0.1",
+		"unified": "^10.1.2"
 	}
 }
