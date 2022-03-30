@@ -53,22 +53,33 @@ function processDrop(app, event) {
 	if (!view || !view.editor) return;
 
 	const sourceEditor = view.editor;
-	const targetEditor = event.target.cmView;
-	const targetPos = event.target.cmView.editorView.state.doc.lineAt(
+	const targetEditor = event.target.cmView.editorView;
+	const targetLine = event.target.cmView.editorView.state.doc.lineAt(
 		event.target.cmView.posAtStart
-	).to;
+	);
 
 	const text = sourceEditor.getValue();
 	const item = findListItem(text, sourceLine);
 	if (item) {
-		const changes = [];
 		const from = item.node.position.start.offset;
 		const to = item.node.position.end.offset;
-		changes.push({ from: from - 1, to });
-		const textToInsert = text.slice(from, to);
-		changes.push({ from: targetPos, insert: "\n" + textToInsert });
-		console.log(changes);
-		sourceEditor.cm.dispatch({ changes });
+
+		const deleteOp = { from: from - 1, to };
+
+		const textToInsert = "\n" + text.slice(from, to);
+		const firstLineIndent = targetLine.text.match(/^\t*/)[0].length + 1;
+		const textToInsertWithTabs = textToInsert.replace(
+			/\n/g,
+			"\n" + "\t".repeat(firstLineIndent)
+		);
+		const insertOp = { from: targetLine.to, insert: textToInsertWithTabs };
+
+		if (sourceEditor.cm == targetEditor)
+			sourceEditor.cm.dispatch({ changes: [deleteOp, insertOp] });
+		else {
+			sourceEditor.cm.dispatch({ changes: [deleteOp] });
+			targetEditor.dispatch({ changes: [insertOp] });
+		}
 	}
 }
 
