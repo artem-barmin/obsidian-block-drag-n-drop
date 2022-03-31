@@ -23,7 +23,7 @@ function findListItem(text, line) {
 	return _.minBy(allItems, "height");
 }
 
-const emptyMarker = (line) =>
+const dragHandle = (line) =>
 	new (class extends GutterMarker {
 		toDOM() {
 			const handle = document.createElement("div");
@@ -37,11 +37,11 @@ const emptyMarker = (line) =>
 		}
 	})();
 
-const emptyLineGutter = gutter({
+const dragLineMarker = gutter({
 	lineMarker(view, line) {
 		return line.from == line.to
 			? null
-			: emptyMarker(view.state.doc.lineAt(line.from).number);
+			: dragHandle(view.state.doc.lineAt(line.from).number);
 	},
 });
 
@@ -85,8 +85,8 @@ function processDrop(app, event) {
 
 export default class MyPlugin extends Plugin {
 	async onload() {
-		const that = this;
-		this.registerEditorExtension(emptyLineGutter);
+		const app = this.app;
+		this.registerEditorExtension(dragLineMarker);
 		this.registerEditorExtension(
 			EditorView.domEventHandlers({
 				dragover(event, view) {
@@ -103,7 +103,7 @@ export default class MyPlugin extends Plugin {
 					target.classList.remove("drag-over");
 				},
 				drop(event, viewDrop) {
-					processDrop(that.app, event);
+					processDrop(app, event);
 				},
 			})
 		);
