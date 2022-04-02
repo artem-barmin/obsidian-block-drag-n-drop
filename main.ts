@@ -118,7 +118,7 @@ function processDrop(app, event) {
 		if (type === "move") {
 			const sourceLine = sourceEditor.cm.state.doc.lineAt(from);
 
-			const deleteOp = { from: sourceLine.from - 1, to };
+			const deleteOp = { from: Math.max(sourceLine.from - 1, 0), to };
 			const computeIndent = (line) => line.text.match(/^\t*/)[0].length;
 
 			const textToInsert = "\n" + text.slice(sourceLine.from, to);
