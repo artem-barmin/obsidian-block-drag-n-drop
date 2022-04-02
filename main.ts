@@ -105,9 +105,7 @@ function processDrop(app, event) {
 	const sourceEditor = view.editor;
 	const targetEditor = event.target.cmView.editorView;
 
-	// const sourceLine = sourceEditor.viewState.state.doc.lineAt(sourceLineNum);
-	const targetLine =
-		event.target.cmView.editorView.state.doc.lineAt(targetLinePos);
+	const targetLine = targetEditor.state.doc.lineAt(targetLinePos);
 
 	const type = "move";
 	const text = sourceEditor.getValue();
@@ -118,20 +116,31 @@ function processDrop(app, event) {
 		let operations;
 
 		if (type === "move") {
-			const deleteOp = { from: from - 1, to };
-			const computeIndent = (line) =>
-				line.text.match(/^\t*/)[0].length + 1;
+			const sourceLine = sourceEditor.cm.state.doc.lineAt(from);
 
-			const textToInsert = "\n" + text.slice(from, to);
-			// const originalLineIndent = computeIndent(sourceLine);
-			const firstLineIndent = computeIndent(targetLine);
-			const textToInsertWithTabs = textToInsert.replace(
-				/\n/g,
-				"\n" + "\t".repeat(firstLineIndent)
+			const deleteOp = { from: sourceLine.from - 1, to };
+			const computeIndent = (line) => line.text.match(/^\t*/)[0].length;
+
+			const textToInsert = "\n" + text.slice(sourceLine.from, to);
+			const sourceIndent = computeIndent(sourceLine);
+			const targetIndent = computeIndent(targetLine);
+
+			const addTabs = Math.max(targetIndent - sourceIndent + 1, 0);
+			const removeTabs = Math.max(sourceIndent - targetIndent - 1, 0);
+
+			const removeTabsRegex = new RegExp(
+				"\n" + "\t".repeat(removeTabs),
+				"g"
+			);
+			const addTabsRegex = "\n" + "\t".repeat(addTabs);
+
+			const indentedText = textToInsert.replace(
+				removeTabsRegex,
+				addTabsRegex
 			);
 			const insertOp = {
 				from: targetLine.to,
-				insert: textToInsertWithTabs,
+				insert: indentedText,
 			};
 
 			operations = { source: [deleteOp], target: [insertOp] };
