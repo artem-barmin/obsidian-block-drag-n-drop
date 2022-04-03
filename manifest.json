@@ -1,10 +1,10 @@
 {
-	"id": "obsidian-sample-plugin",
-	"name": "Sample Plugin",
+	"id": "obsidian-drag-n-drop-plugin",
+	"name": "Items Drag'n'Drop",
 	"version": "1.0.1",
 	"minAppVersion": "0.12.0",
-	"description": "This is a sample plugin for Obsidian. This plugin demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
+	"description": "Allow copying blocks and on-fly creation of embeds just like Logseq or Roam",
+	"author": "Artem Barmin",
+	"authorUrl": "https://github.com/artem-barmin/obsidian-block-drag-n-drop",
 	"isDesktopOnly": false
 }

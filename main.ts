@@ -1,4 +1,4 @@
-import { Plugin, MarkdownView } from "obsidian";
+import { Plugin, MarkdownView, PluginSettingTab, Setting } from "obsidian";
 import { gutter, GutterMarker } from "@codemirror/gutter";
 import { EditorView } from "@codemirror/view";
 import { unified } from "unified";
@@ -94,7 +94,7 @@ function getBlock(app, line, file) {
 	};
 }
 
-function processDrop(app, event) {
+function processDrop(app, event, settings) {
 	const sourceLineNum = parseInt(event.dataTransfer.getData("line"), 10);
 	const targetLinePos = event.target.cmView.posAtStart;
 
@@ -107,7 +107,17 @@ function processDrop(app, event) {
 
 	const targetLine = targetEditor.state.doc.lineAt(targetLinePos);
 
-	const type = "move";
+	const modifier = event.ctrlKey
+		? "ctrl"
+		: event.shiftKey
+		? "shift"
+		: event.altKey
+		? "alt"
+		: "simple";
+
+	console.log(event);
+
+	const type = sourceEditor.cm == targetEditor ? "move" : settings[modifier];
 	const text = sourceEditor.getValue();
 	const item = findListItem(text, sourceLineNum, "listItem");
 	if (item) {
@@ -145,7 +155,7 @@ function processDrop(app, event) {
 
 			operations = { source: [deleteOp], target: [insertOp] };
 		} else if (type === "embed") {
-			const { id, changes } = getBlock(app, sourceLine - 1, view.file);
+			const { id, changes } = getBlock(app, sourceLineNum - 1, view.file);
 			const insertBlockOp = {
 				from: targetLine.to,
 				insert: ` ![[${view.file.basename}#^${id}]]`,
@@ -155,7 +165,6 @@ function processDrop(app, event) {
 		}
 
 		const { source, target } = operations;
-		console.log("ops:", operations);
 		if (sourceEditor.cm == targetEditor)
 			sourceEditor.cm.dispatch({ changes: [...source, ...target] });
 		else {
@@ -165,15 +174,24 @@ function processDrop(app, event) {
 	}
 }
 
-export default class MyPlugin extends Plugin {
+const DEFAULT_SETTINGS = {
+	simple: "embed",
+	ctrl: "move",
+	shift: "copy",
+	alt: "none",
+};
+
+export default class DragNDropPlugin extends Plugin {
 	async onload() {
 		const app = this.app;
+		const settings = await this.loadSettings();
+		this.addSettingTab(new DragNDropSettings(this.app, this));
 		this.registerEditorExtension(dragLineMarker);
 		this.registerEditorExtension(
 			EditorView.domEventHandlers({
 				dragover(event, view) {
 					// add class to element
-					const target = event.target as HTMLElement;
+					const target = event.target;
 					if (target.classList.contains("HyperMD-list-line")) {
 						target.classList.add("drag-over");
 						event.preventDefault();
@@ -181,13 +199,76 @@ export default class MyPlugin extends Plugin {
 				},
 				dragleave(event, view) {
 					// remove class from element
-					const target = event.target as HTMLElement;
+					const target = event.target;
 					target.classList.remove("drag-over");
 				},
 				drop(event, viewDrop) {
-					processDrop(app, event);
+					processDrop(app, event, settings);
 				},
 			})
 		);
+	}
+
+	async loadSettings() {
+		this.settings = Object.assign(
+			{},
+			DEFAULT_SETTINGS,
+			await this.loadData()
+		);
+		return this.settings;
+	}
+
+	async saveSettings() {
+		console.log("save", this.settings);
+		await this.saveData(this.settings);
+	}
+}
+
+class DragNDropSettings extends PluginSettingTab {
+	plugin: DragNDropPlugin;
+
+	constructor(app: App, plugin: DragNDropPlugin) {
+		super(app, plugin);
+		this.plugin = plugin;
+	}
+
+	display(): void {
+		const { containerEl } = this;
+
+		containerEl.empty();
+
+		containerEl.createEl("h2", {
+			text: "Modifiers",
+		});
+
+		const addDropdownVariants = (settingName) => (dropDown) => {
+			console.log("set value", this.plugin.settings[settingName]);
+
+			dropDown.addOption("none", "Do nothing");
+			dropDown.addOption("embed", "Embed link");
+			dropDown.addOption("copy", "Copy block");
+			dropDown.addOption("move", "Move block");
+			dropDown.setValue(this.plugin.settings[settingName]);
+			dropDown.onChange(async (value) => {
+				this.plugin.settings[settingName] = value;
+				await this.plugin.saveSettings();
+			});
+		};
+
+		new Setting(containerEl)
+			.setName("Drag'n'drop without modifiers")
+			.addDropdown(addDropdownVariants("simple"));
+
+		new Setting(containerEl)
+			.setName("Drag'n'drop with Cmd/Ctrl")
+			.addDropdown(addDropdownVariants("ctrl"));
+
+		new Setting(containerEl)
+			.setName("Drag'n'drop with Shift")
+			.addDropdown(addDropdownVariants("shift"));
+
+		new Setting(containerEl)
+			.setName("Drag'n'drop with Alt/Meta")
+			.addDropdown(addDropdownVariants("alt"));
 	}
 }
