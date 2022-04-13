@@ -1,6 +1,28 @@
+:root {
+	--dnd-gutter-handle: red;
+}
+
+/* @settings
+
+name: Drag'n-drop
+id: drag-n-drop
+settings:
+    - 
+        id: my-title
+        title: Handle settings
+        type: heading
+        level: 3
+    - 
+        id: dnd-gutter-handle
+        title: Gutter handle color
+        type: variable-color
+        format: hsl-split
+        default: red
+*/
+
 .gutter-marker {
 	/* opacity: 0; */
-	color: red;
+	color: var(--dnd-gutter-handle);
 	cursor: pointer;
 }
 

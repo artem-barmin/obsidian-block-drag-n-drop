@@ -1,10 +1,10 @@
 {
 	"id": "obsidian-drag-n-drop-plugin",
-	"name": "Items Drag'n'Drop",
+	"name": "Drag-n-Drop",
 	"version": "1.0.1",
 	"minAppVersion": "0.12.0",
-	"description": "Allow copying blocks and on-fly creation of embeds just like Logseq or Roam",
+	"description": "Allow moving/copying/and creation embeds with drag-n-drop just like Logseq or Roam",
 	"author": "Artem Barmin",
 	"authorUrl": "https://github.com/artem-barmin/obsidian-block-drag-n-drop",
-	"isDesktopOnly": false
+	"isDesktopOnly": true
 }

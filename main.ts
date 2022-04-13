@@ -94,7 +94,23 @@ function getBlock(app, line, file) {
 	};
 }
 
-function processDrop(app, event, settings) {
+function defineOperationType(event, settings, cmdPressed, isSameEditor) {
+	const modifier =
+		event.ctrlKey || cmdPressed
+			? "ctrl"
+			: event.shiftKey
+			? "shift"
+			: event.altKey
+			? "alt"
+			: "simple";
+
+	if (modifier === "simple") {
+		if (isSameEditor) return settings["simple_same_pane"];
+		else return settings["simple_different_panes"];
+	} else return settings[modifier];
+}
+
+function processDrop(app, event, settings, cmdPressed) {
 	const sourceLineNum = parseInt(event.dataTransfer.getData("line"), 10);
 	const targetLinePos = event.target.cmView.posAtStart;
 
@@ -107,17 +123,13 @@ function processDrop(app, event, settings) {
 
 	const targetLine = targetEditor.state.doc.lineAt(targetLinePos);
 
-	const modifier = event.ctrlKey
-		? "ctrl"
-		: event.shiftKey
-		? "shift"
-		: event.altKey
-		? "alt"
-		: "simple";
+	const type = defineOperationType(
+		event,
+		settings,
+		cmdPressed,
+		sourceEditor.cm == targetEditor
+	);
 
-	console.log(event);
-
-	const type = sourceEditor.cm == targetEditor ? "move" : settings[modifier];
 	const text = sourceEditor.getValue();
 	const item = findListItem(text, sourceLineNum, "listItem");
 	if (item) {
@@ -125,7 +137,7 @@ function processDrop(app, event, settings) {
 		const to = item.node.position.end.offset;
 		let operations;
 
-		if (type === "move") {
+		if (type === "move" || type === "copy") {
 			const sourceLine = sourceEditor.cm.state.doc.lineAt(from);
 
 			const deleteOp = { from: Math.max(sourceLine.from - 1, 0), to };
@@ -153,7 +165,10 @@ function processDrop(app, event, settings) {
 				insert: indentedText,
 			};
 
-			operations = { source: [deleteOp], target: [insertOp] };
+			operations = {
+				source: type === "move" ? [deleteOp] : [],
+				target: [insertOp],
+			};
 		} else if (type === "embed") {
 			const { id, changes } = getBlock(app, sourceLineNum - 1, view.file);
 			const insertBlockOp = {
@@ -164,6 +179,7 @@ function processDrop(app, event, settings) {
 			operations = { source: [changes], target: [insertBlockOp] };
 		}
 
+		console.log("Move item", type, operations);
 		const { source, target } = operations;
 		if (sourceEditor.cm == targetEditor)
 			sourceEditor.cm.dispatch({ changes: [...source, ...target] });
@@ -175,7 +191,8 @@ function processDrop(app, event, settings) {
 }
 
 const DEFAULT_SETTINGS = {
-	simple: "embed",
+	simple_same_pane: "move",
+	simple_different_panes: "embed",
 	ctrl: "move",
 	shift: "copy",
 	alt: "none",
@@ -187,8 +204,15 @@ export default class DragNDropPlugin extends Plugin {
 		const settings = await this.loadSettings();
 		this.addSettingTab(new DragNDropSettings(this.app, this));
 		this.registerEditorExtension(dragLineMarker);
+		let cmdPressed = false;
 		this.registerEditorExtension(
 			EditorView.domEventHandlers({
+				keydown(event) {
+					if (event.keyCode === 17) cmdPressed = true;
+				},
+				keyup(event) {
+					if (event.keyCode === 17) cmdPressed = false;
+				},
 				dragover(event, view) {
 					// add class to element
 					const target = event.target;
@@ -203,7 +227,7 @@ export default class DragNDropPlugin extends Plugin {
 					target.classList.remove("drag-over");
 				},
 				drop(event, viewDrop) {
-					processDrop(app, event, settings);
+					processDrop(app, event, settings, cmdPressed);
 				},
 			})
 		);
@@ -219,7 +243,6 @@ export default class DragNDropPlugin extends Plugin {
 	}
 
 	async saveSettings() {
-		console.log("save", this.settings);
 		await this.saveData(this.settings);
 	}
 }
@@ -256,8 +279,12 @@ class DragNDropSettings extends PluginSettingTab {
 		};
 
 		new Setting(containerEl)
-			.setName("Drag'n'drop without modifiers")
-			.addDropdown(addDropdownVariants("simple"));
+			.setName("Drag'n'drop without modifiers in the same pane")
+			.addDropdown(addDropdownVariants("simple_same_pane"));
+
+		new Setting(containerEl)
+			.setName("Drag'n'drop without modifiers in the different panes")
+			.addDropdown(addDropdownVariants("simple_different_panes"));
 
 		new Setting(containerEl)
 			.setName("Drag'n'drop with Cmd/Ctrl")
