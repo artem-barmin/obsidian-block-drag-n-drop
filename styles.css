@@ -20,13 +20,13 @@ settings:
         default: red
 */
 
-.gutter-marker {
+.dnd-gutter-marker {
 	/* opacity: 0; */
 	color: var(--dnd-gutter-handle);
 	cursor: pointer;
 }
 
-.gutter-marker:hover {
+.dnd-gutter-marker:hover {
 	opacity: 1;
 }
 

@@ -32,7 +32,7 @@ const dragHandle = (line) =>
 		toDOM() {
 			const handle = document.createElement("div");
 			handle.appendChild(document.createTextNode(":::"));
-			handle.className = "gutter-marker";
+			handle.className = "dnd-gutter-marker";
 			handle.setAttribute("draggable", true);
 			handle.addEventListener("dragstart", (e) =>
 				e.dataTransfer.setData("line", line)
@@ -123,12 +123,12 @@ function processDrop(app, event, settings, cmdPressed) {
 
 	const targetLine = targetEditor.state.doc.lineAt(targetLinePos);
 
-	const type = defineOperationType(
-		event,
-		settings,
-		cmdPressed,
-		sourceEditor.cm == targetEditor
-	);
+	const isSameEditor = sourceEditor.cm == targetEditor;
+
+	// if line was not moved - do nothing
+	if (targetLine.number === sourceLineNum && isSameEditor) return;
+
+	const type = defineOperationType(event, settings, cmdPressed, isSameEditor);
 
 	const text = sourceEditor.getValue();
 	const item = findListItem(text, sourceLineNum, "listItem");
@@ -140,26 +140,30 @@ function processDrop(app, event, settings, cmdPressed) {
 		if (type === "move" || type === "copy") {
 			const sourceLine = sourceEditor.cm.state.doc.lineAt(from);
 
-			const deleteOp = { from: Math.max(sourceLine.from - 1, 0), to };
+			const textToInsert = "\n" + text.slice(sourceLine.from, to);
+
+			// adjust indent for each line of the source block
 			const computeIndent = (line) => line.text.match(/^\t*/)[0].length;
 
-			const textToInsert = "\n" + text.slice(sourceLine.from, to);
 			const sourceIndent = computeIndent(sourceLine);
 			const targetIndent = computeIndent(targetLine);
 
-			const addTabs = Math.max(targetIndent - sourceIndent + 1, 0);
-			const removeTabs = Math.max(sourceIndent - targetIndent - 1, 0);
+			const addTabsNum = Math.max(targetIndent - sourceIndent + 1, 0);
+			const removeTabsNum = Math.max(sourceIndent - targetIndent - 1, 0);
 
 			const removeTabsRegex = new RegExp(
-				"\n" + "\t".repeat(removeTabs),
+				"\n" + "\t".repeat(removeTabsNum),
 				"g"
 			);
-			const addTabsRegex = "\n" + "\t".repeat(addTabs);
+			const addTabsRegex = "\n" + "\t".repeat(addTabsNum);
 
 			const indentedText = textToInsert.replace(
 				removeTabsRegex,
 				addTabsRegex
 			);
+
+			// build operations for applying with editor
+			const deleteOp = { from: Math.max(sourceLine.from - 1, 0), to };
 			const insertOp = {
 				from: targetLine.to,
 				insert: indentedText,

@@ -12,7 +12,7 @@
 
 # Roadmap
 
--   Support for arbitrary text block dragging - paragraphs, headings etc
+-   [ ] Support for arbitrary block dragging - paragraphs, headings etc
 
 # How to install
 
