@@ -137,6 +137,12 @@ function processDrop(app, event, settings, cmdPressed) {
 		const to = item.node.position.end.offset;
 		let operations;
 
+		const targetItem = findListItem(
+			targetEditor.state.toJSON().doc,
+			targetLine.number,
+			"paragraph"
+		);
+
 		if (type === "move" || type === "copy") {
 			const sourceLine = sourceEditor.cm.state.doc.lineAt(from);
 
@@ -165,7 +171,7 @@ function processDrop(app, event, settings, cmdPressed) {
 			// build operations for applying with editor
 			const deleteOp = { from: Math.max(sourceLine.from - 1, 0), to };
 			const insertOp = {
-				from: targetLine.to,
+				from: targetItem?.node?.position?.end?.offset || targetLine.to,
 				insert: indentedText,
 			};
 
@@ -176,7 +182,7 @@ function processDrop(app, event, settings, cmdPressed) {
 		} else if (type === "embed") {
 			const { id, changes } = getBlock(app, sourceLineNum - 1, view.file);
 			const insertBlockOp = {
-				from: targetLine.to,
+				from: targetItem?.node?.position?.end?.offset || targetLine.to,
 				insert: ` ![[${view.file.basename}#^${id}]]`,
 			};
 
