@@ -225,15 +225,15 @@ export default class DragNDropPlugin extends Plugin {
 				dragover(event, view) {
 					// add class to element
 					const target = event.target;
-					if (target.classList.contains("HyperMD-list-line")) {
-						target.classList.add("drag-over");
-						event.preventDefault();
-					}
+					const line = target.closest(".HyperMD-list-line");
+					if (line) line.classList.add("drag-over");
+					event.preventDefault();
 				},
 				dragleave(event, view) {
 					// remove class from element
 					const target = event.target;
-					target.classList.remove("drag-over");
+					const line = target.closest(".HyperMD-list-line");
+					if (line) line.classList.remove("drag-over");
 				},
 				drop(event, viewDrop) {
 					processDrop(app, event, settings, cmdPressed);
