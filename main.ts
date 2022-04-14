@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Plugin, MarkdownView, PluginSettingTab, Setting } from "obsidian";
 import { gutter, GutterMarker } from "@codemirror/gutter";
 import { EditorView } from "@codemirror/view";
