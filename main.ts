@@ -142,6 +142,8 @@ function processDrop(app, event, settings, cmdPressed) {
 			targetLine.number,
 			"paragraph"
 		);
+		const targetItemLastLine =
+			targetItem?.node?.position?.end?.offset || targetLine.to;
 
 		if (type === "move" || type === "copy") {
 			const sourceLine = sourceEditor.cm.state.doc.lineAt(from);
@@ -170,10 +172,7 @@ function processDrop(app, event, settings, cmdPressed) {
 
 			// build operations for applying with editor
 			const deleteOp = { from: Math.max(sourceLine.from - 1, 0), to };
-			const insertOp = {
-				from: targetItem?.node?.position?.end?.offset || targetLine.to,
-				insert: indentedText,
-			};
+			const insertOp = { from: targetItemLastLine, insert: indentedText };
 
 			operations = {
 				source: type === "move" ? [deleteOp] : [],
@@ -182,7 +181,7 @@ function processDrop(app, event, settings, cmdPressed) {
 		} else if (type === "embed") {
 			const { id, changes } = getBlock(app, sourceLineNum - 1, view.file);
 			const insertBlockOp = {
-				from: targetItem?.node?.position?.end?.offset || targetLine.to,
+				from: targetItemLastLine,
 				insert: ` ![[${view.file.basename}#^${id}]]`,
 			};
 
