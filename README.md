@@ -35,6 +35,13 @@ Download main.js, manifest.json, styles.css from the latest release and put them
 
 You can see a drag-n-drop handler in the gutter. You can drag it and drop at line you want
 
+## Defaults
+- Drag and drop from one pane to another without modifiers will create embed link for the block. Id for block will be automatically created.
+- Drag and drop in the same pane without modifiers will move the block.
+- Drag and drop from one pane to another with "Shift" modifier will copy the block.
+
+You can change behavior for settings in the plugin settings tab.
+
 # Libraries used
 
 - [remark](https://github.com/remarkjs/remark) - used for parsing markdown lists

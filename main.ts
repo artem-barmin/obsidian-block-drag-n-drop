@@ -203,7 +203,7 @@ function processDrop(app, event, settings, cmdPressed) {
 const DEFAULT_SETTINGS = {
 	simple_same_pane: "move",
 	simple_different_panes: "embed",
-	ctrl: "move",
+	ctrl: "none",
 	shift: "copy",
 	alt: "none",
 };
