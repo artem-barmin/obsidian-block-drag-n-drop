@@ -34,3 +34,7 @@ Download main.js, manifest.json, styles.css from the latest release and put them
 # How to use
 
 You can see a drag-n-drop handler in the gutter. You can drag it and drop at line you want
+
+# Libraries used
+
+- [remark](https://github.com/remarkjs/remark) - used for parsing markdown lists
