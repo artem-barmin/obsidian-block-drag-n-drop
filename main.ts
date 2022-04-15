@@ -46,8 +46,10 @@ function copyItemLinesToDragContainer(app, line, drag) {
 		dragContainer.setAttribute("style", cmContent.getAttribute("style"));
 	lines.forEach((line) => dragContainer.appendChild(line.cloneNode(true)));
 	drag.appendChild(dragContainer);
+	document.body.classList.add("dnd-render-draggable-content");
 	setTimeout(() => {
 		dragContainer.classList.add("dnd-drag-container-inactive");
+		document.body.classList.remove("dnd-render-draggable-content");
 	}, 0);
 }
 
@@ -284,6 +286,7 @@ export default class DragNDropPlugin extends Plugin {
 					if (event.keyCode === 17) cmdPressed = false;
 				},
 				dragover(event, view) {
+					removeAllClasses("drag-over");
 					highlightWholeItem(event);
 					event.preventDefault();
 				},

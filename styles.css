@@ -20,6 +20,10 @@ settings:
         default: red
 */
 
+.dnd-render-draggable-content .dnd-gutter-marker {
+    display: none;
+}
+
 .dnd-gutter-marker {
     /* opacity: 0; */
     color: var(--dnd-gutter-handle);
