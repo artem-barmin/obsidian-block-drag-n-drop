@@ -36,19 +36,19 @@ function copyItemLinesToDragContainer(app, line, drag) {
 	const lineDom = targetEditor.domAtPos(lineHandle.from).node;
 	const lines = getAllLinesForCurrentItem(lineDom, targetEditor);
 
-	const dragContainer = document.createElement("div");
-	dragContainer.className =
+	const container = document.createElement("div");
+	container.className =
 		"markdown-source-view mod-cm6 cm-content dnd-drag-container";
 	const cmContent = document.querySelector(
 		".cm-contentContainer .cm-content"
 	);
 	if (cmContent)
-		dragContainer.setAttribute("style", cmContent.getAttribute("style"));
-	lines.forEach((line) => dragContainer.appendChild(line.cloneNode(true)));
-	drag.appendChild(dragContainer);
+		container.setAttribute("style", cmContent.getAttribute("style"));
+	lines.forEach(({ line }) => container.appendChild(line.cloneNode(true)));
+	drag.appendChild(container);
 	document.body.classList.add("dnd-render-draggable-content");
 	setTimeout(() => {
-		dragContainer.classList.add("dnd-drag-container-inactive");
+		container.classList.add("dnd-drag-container-inactive");
 		document.body.classList.remove("dnd-render-draggable-content");
 	}, 0);
 }
@@ -115,6 +115,7 @@ function getBlock(app, line, file) {
 
 	return {
 		...block,
+		id,
 		changes: [
 			{ from: block.position.end.offset, insert: spacer + "^" + id },
 		],
@@ -230,17 +231,27 @@ function getAllLinesForCurrentItem(lineDom, targetEditor) {
 	const doc = targetEditor.state.doc;
 	const posAtLine = targetEditor.posAtDOM(lineDom);
 	const targetLine = doc.lineAt(posAtLine);
+	const editorState = targetEditor.state.toJSON().doc;
 
-	const targetItem = findListItem(
-		targetEditor.state.toJSON().doc,
+	const targetItem = findListItem(editorState, targetLine.number, "listItem");
+
+	const insertPositionItem = findListItem(
+		editorState,
 		targetLine.number,
-		"listItem"
-	).node;
+		"paragraph"
+	);
+	const targetItemLastLine =
+		insertPositionItem?.node?.position?.end?.line || targetLine.number;
 
 	return _.range(
-		targetItem.position.start.line,
-		targetItem.position.end.line + 1
-	).map((lineNum) => targetEditor.domAtPos(doc.line(lineNum).from).node);
+		targetItem.node.position.start.line,
+		targetItem.node.position.end.line + 1
+	)
+		.map((lineNum) => ({
+			line: targetEditor.domAtPos(doc.line(lineNum).from).node,
+			isTargetLine: lineNum === targetItemLastLine,
+		}))
+		.filter(({ line }) => !!line);
 }
 
 function highlightWholeItem(event) {
@@ -249,9 +260,9 @@ function highlightWholeItem(event) {
 		event.target.cmView.editorView
 	);
 
-	_.forEach(allLines, (line, i) => {
+	_.forEach(allLines, ({ line, isTargetLine }) => {
 		line.classList.add("drag-over");
-		if (i === allLines.length - 1) line.classList.add("drag-last");
+		if (isTargetLine) line.classList.add("drag-last");
 	});
 }
 
@@ -287,11 +298,13 @@ export default class DragNDropPlugin extends Plugin {
 				},
 				dragover(event, view) {
 					removeAllClasses("drag-over");
+					removeAllClasses("drag-last");
 					highlightWholeItem(event);
 					event.preventDefault();
 				},
 				dragleave(event, view) {
 					removeAllClasses("drag-over");
+					removeAllClasses("drag-last");
 				},
 				drop(event, viewDrop) {
 					processDrop(app, event, settings, cmdPressed);
