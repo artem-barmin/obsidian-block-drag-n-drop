@@ -1,5 +1,5 @@
 :root {
-	--dnd-gutter-handle: red;
+    --dnd-gutter-handle: red;
 }
 
 /* @settings
@@ -21,15 +21,23 @@ settings:
 */
 
 .dnd-gutter-marker {
-	/* opacity: 0; */
-	color: var(--dnd-gutter-handle);
-	cursor: pointer;
+    /* opacity: 0; */
+    color: var(--dnd-gutter-handle);
+    cursor: pointer;
 }
 
 .dnd-gutter-marker:hover {
-	opacity: 1;
+    opacity: 1;
 }
 
 .drag-over {
-	border-bottom: 2px solid black;
+    background-color: rgba(0, 255, 255, 0.697);
+}
+
+.drag-last {
+    border-bottom: 2px solid black;
+}
+
+.cm-dropCursor {
+    display: none !important;
 }

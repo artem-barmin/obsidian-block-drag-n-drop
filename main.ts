@@ -81,14 +81,14 @@ function getBlock(app, line, file) {
 	}
 
 	// return block id if it exists
-	if (block.id) return { id: block.id, changes: [] };
+	if (block.id) return { ...block, changes: [] };
 
 	// generate and write block id
 	const id = generateId();
 	const spacer = shouldInsertAfter(block) ? "\n\n" : " ";
 
 	return {
-		id,
+		...block,
 		changes: [
 			{ from: block.position.end.offset, insert: spacer + "^" + id },
 		],
@@ -200,6 +200,51 @@ function processDrop(app, event, settings, cmdPressed) {
 	}
 }
 
+function getAllLinesForCurrentItem(lineDom) {
+	const posAtLine = targetEditor.posAtDOM(lineDom);
+	const targetLine = doc.lineAt(posAtLine);
+
+	const targetItem = findListItem(
+		targetEditor.state.toJSON().doc,
+		targetLine.number,
+		"listItem"
+	).node;
+
+	return _.range(
+		targetItem.position.start.line,
+		targetItem.position.end.line + 1
+	).map((lineNum) => targetEditor.domAtPos(doc.line(lineNum).from).node);
+}
+
+function highlightWholeItem(event) {
+	const target = event.target;
+	const targetEditor = target.cmView.editorView;
+	const doc = targetEditor.state.doc;
+
+	const line = target.closest(".HyperMD-list-line");
+	const posAtLine = targetEditor.posAtDOM(line);
+	const targetLine = doc.lineAt(posAtLine);
+
+	const targetItem = findListItem(
+		targetEditor.state.toJSON().doc,
+		targetLine.number,
+		"listItem"
+	).node;
+
+	for (
+		let line = targetItem.position.start.line;
+		line <= targetItem.position.end.line;
+		line++
+	) {
+		const lineOfItem = targetEditor.domAtPos(doc.line(line).from).node;
+		if (lineOfItem) {
+			lineOfItem.classList.add("drag-over");
+			if (line === targetItem.position.end.line)
+				lineOfItem.classList.add("drag-last");
+		}
+	}
+}
+
 const DEFAULT_SETTINGS = {
 	simple_same_pane: "move",
 	simple_different_panes: "embed",
@@ -224,17 +269,13 @@ export default class DragNDropPlugin extends Plugin {
 					if (event.keyCode === 17) cmdPressed = false;
 				},
 				dragover(event, view) {
-					// add class to element
-					const target = event.target;
-					const line = target.closest(".HyperMD-list-line");
-					if (line) line.classList.add("drag-over");
+					highlightWholeItem(event);
 					event.preventDefault();
 				},
 				dragleave(event, view) {
-					// remove class from element
-					const target = event.target;
-					const line = target.closest(".HyperMD-list-line");
-					if (line) line.classList.remove("drag-over");
+					Array.from(document.querySelectorAll(".drag-over")).forEach(
+						(el) => el.classList.remove("drag-over")
+					);
 				},
 				drop(event, viewDrop) {
 					processDrop(app, event, settings, cmdPressed);
