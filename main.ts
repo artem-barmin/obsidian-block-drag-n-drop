@@ -28,39 +28,38 @@ function findListItem(text, line, itemType) {
 	return _.minBy(allItems, "height");
 }
 
+function copyItemLinesToDragContainer(app, line, drag) {
+	const view = app.workspace.getActiveViewOfType(MarkdownView);
+	if (!view || !view.editor) return;
+	const targetEditor = view.editor.cm;
+	const lineHandle = targetEditor.state.doc.line(line);
+	const lineDom = targetEditor.domAtPos(lineHandle.from).node;
+	const lines = getAllLinesForCurrentItem(lineDom, targetEditor);
+
+	const dragContainer = document.createElement("div");
+	dragContainer.className =
+		"markdown-source-view mod-cm6 cm-content dnd-drag-container";
+	const cmContent = document.querySelector(
+		".cm-contentContainer .cm-content"
+	);
+	if (cmContent)
+		dragContainer.setAttribute("style", cmContent.getAttribute("style"));
+	lines.forEach((line) => dragContainer.appendChild(line.cloneNode(true)));
+	drag.appendChild(dragContainer);
+	setTimeout(() => {
+		dragContainer.classList.add("dnd-drag-container-inactive");
+	}, 0);
+}
+
 const dragHandle = (line, app) =>
 	new (class extends GutterMarker {
 		toDOM() {
 			const drag = document.createElement("div");
 			drag.innerHTML = "<span class='dnd-gutter-marker'>:::</span>";
-
 			drag.setAttribute("draggable", true);
 			drag.addEventListener("dragstart", (e) => {
 				e.dataTransfer.setData("line", line);
-				const view = app.workspace.getActiveViewOfType(MarkdownView);
-				if (!view || !view.editor) return;
-				const targetEditor = view.editor.cm;
-				const lineHandle = targetEditor.state.doc.line(line);
-				const lineDom = targetEditor.domAtPos(lineHandle.from).node;
-				const lines = getAllLinesForCurrentItem(lineDom, targetEditor);
-
-				drag.innerHTML = "";
-
-				const dragContainer = document.createElement("div");
-				dragContainer.className =
-					"markdown-source-view mod-cm6 cm-content dnd-drag-container";
-				const cmContent = document.querySelector(
-					".cm-contentContainer .cm-content"
-				);
-				if (cmContent)
-					dragContainer.setAttribute(
-						"style",
-						cmContent.getAttribute("style")
-					);
-				lines.forEach((line) =>
-					dragContainer.appendChild(line.cloneNode(true))
-				);
-				drag.appendChild(dragContainer);
+				copyItemLinesToDragContainer(app, line, drag);
 			});
 			return drag;
 		}
@@ -262,6 +261,13 @@ const DEFAULT_SETTINGS = {
 	alt: "none",
 };
 
+function removeAllClasses(className) {
+	const allLines = document.querySelectorAll(`.${className}`);
+	_.forEach(allLines, (line) => {
+		line.classList.remove(className);
+	});
+}
+
 export default class DragNDropPlugin extends Plugin {
 	async onload() {
 		const app = this.app;
@@ -282,9 +288,7 @@ export default class DragNDropPlugin extends Plugin {
 					event.preventDefault();
 				},
 				dragleave(event, view) {
-					Array.from(document.querySelectorAll(".drag-over")).forEach(
-						(el) => el.classList.remove("drag-over")
-					);
+					removeAllClasses("drag-over");
 				},
 				drop(event, viewDrop) {
 					processDrop(app, event, settings, cmdPressed);

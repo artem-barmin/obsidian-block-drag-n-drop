@@ -31,7 +31,7 @@ settings:
 }
 
 .drag-over {
-    background-color: rgba(0, 255, 255, 0.697);
+    background-color: rgba(0, 255, 255, 0.099);
 }
 
 .drag-last {
@@ -42,7 +42,11 @@ settings:
     display: none !important;
 }
 
-.dnd-drag-container .cm-gutterElement {
-    display: none;
+.dnd-drag-container {
+    position:absolute;
 }
 
+.dnd-drag-container-inactive {
+    display: none !important;
+    position: relative;
+}
