@@ -200,7 +200,8 @@ function processDrop(app, event, settings, cmdPressed) {
 	}
 }
 
-function getAllLinesForCurrentItem(lineDom) {
+function getAllLinesForCurrentItem(targetEditor, lineDom) {
+	const doc = targetEditor.state.doc;
 	const posAtLine = targetEditor.posAtDOM(lineDom);
 	const targetLine = doc.lineAt(posAtLine);
 
@@ -217,32 +218,15 @@ function getAllLinesForCurrentItem(lineDom) {
 }
 
 function highlightWholeItem(event) {
-	const target = event.target;
-	const targetEditor = target.cmView.editorView;
-	const doc = targetEditor.state.doc;
+	const targetEditor = event.target.cmView.editorView;
 
-	const line = target.closest(".HyperMD-list-line");
-	const posAtLine = targetEditor.posAtDOM(line);
-	const targetLine = doc.lineAt(posAtLine);
+	const lineDom = event.target.closest(".HyperMD-list-line");
+	const allLines = getAllLinesForCurrentItem(targetEditor, lineDom);
 
-	const targetItem = findListItem(
-		targetEditor.state.toJSON().doc,
-		targetLine.number,
-		"listItem"
-	).node;
-
-	for (
-		let line = targetItem.position.start.line;
-		line <= targetItem.position.end.line;
-		line++
-	) {
-		const lineOfItem = targetEditor.domAtPos(doc.line(line).from).node;
-		if (lineOfItem) {
-			lineOfItem.classList.add("drag-over");
-			if (line === targetItem.position.end.line)
-				lineOfItem.classList.add("drag-last");
-		}
-	}
+	_.forEach(allLines, (line, i) => {
+		line.classList.add("drag-over");
+		if (i === allLines.length - 1) line.classList.add("drag-last");
+	});
 }
 
 const DEFAULT_SETTINGS = {
