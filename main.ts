@@ -57,7 +57,8 @@ const dragHandle = (line, app) =>
 	new (class extends GutterMarker {
 		toDOM() {
 			const drag = document.createElement("div");
-			drag.innerHTML = "<span class='dnd-gutter-marker'>:::</span>";
+			drag.appendChild(document.createTextNode(":::"));
+			drag.class = "dnd-gutter-marker";
 			drag.setAttribute("draggable", true);
 			drag.addEventListener("dragstart", (e) => {
 				e.dataTransfer.setData("line", line);
