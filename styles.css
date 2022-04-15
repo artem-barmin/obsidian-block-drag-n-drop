@@ -41,3 +41,8 @@ settings:
 .cm-dropCursor {
     display: none !important;
 }
+
+.dnd-drag-container .cm-gutterElement {
+    display: none;
+}
+

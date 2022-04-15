@@ -28,27 +28,52 @@ function findListItem(text, line, itemType) {
 	return _.minBy(allItems, "height");
 }
 
-const dragHandle = (line) =>
+const dragHandle = (line, app) =>
 	new (class extends GutterMarker {
 		toDOM() {
-			const handle = document.createElement("div");
-			handle.appendChild(document.createTextNode(":::"));
-			handle.className = "dnd-gutter-marker";
-			handle.setAttribute("draggable", true);
-			handle.addEventListener("dragstart", (e) =>
-				e.dataTransfer.setData("line", line)
-			);
-			return handle;
+			const drag = document.createElement("div");
+			drag.innerHTML = "<span class='dnd-gutter-marker'>:::</span>";
+
+			drag.setAttribute("draggable", true);
+			drag.addEventListener("dragstart", (e) => {
+				e.dataTransfer.setData("line", line);
+				const view = app.workspace.getActiveViewOfType(MarkdownView);
+				if (!view || !view.editor) return;
+				const targetEditor = view.editor.cm;
+				const lineHandle = targetEditor.state.doc.line(line);
+				const lineDom = targetEditor.domAtPos(lineHandle.from).node;
+				const lines = getAllLinesForCurrentItem(lineDom, targetEditor);
+
+				drag.innerHTML = "";
+
+				const dragContainer = document.createElement("div");
+				dragContainer.className =
+					"markdown-source-view mod-cm6 cm-content dnd-drag-container";
+				const cmContent = document.querySelector(
+					".cm-contentContainer .cm-content"
+				);
+				if (cmContent)
+					dragContainer.setAttribute(
+						"style",
+						cmContent.getAttribute("style")
+					);
+				lines.forEach((line) =>
+					dragContainer.appendChild(line.cloneNode(true))
+				);
+				drag.appendChild(dragContainer);
+			});
+			return drag;
 		}
 	})();
 
-const dragLineMarker = gutter({
-	lineMarker(view, line) {
-		return line.from == line.to
-			? null
-			: dragHandle(view.state.doc.lineAt(line.from).number);
-	},
-});
+const dragLineMarker = (app) =>
+	gutter({
+		lineMarker(view, line) {
+			return line.from == line.to
+				? null
+				: dragHandle(view.state.doc.lineAt(line.from).number, app);
+		},
+	});
 
 function shouldInsertAfter(block) {
 	if (block.type) {
@@ -200,7 +225,7 @@ function processDrop(app, event, settings, cmdPressed) {
 	}
 }
 
-function getAllLinesForCurrentItem(targetEditor, lineDom) {
+function getAllLinesForCurrentItem(lineDom, targetEditor) {
 	const doc = targetEditor.state.doc;
 	const posAtLine = targetEditor.posAtDOM(lineDom);
 	const targetLine = doc.lineAt(posAtLine);
@@ -218,10 +243,10 @@ function getAllLinesForCurrentItem(targetEditor, lineDom) {
 }
 
 function highlightWholeItem(event) {
-	const targetEditor = event.target.cmView.editorView;
-
-	const lineDom = event.target.closest(".HyperMD-list-line");
-	const allLines = getAllLinesForCurrentItem(targetEditor, lineDom);
+	const allLines = getAllLinesForCurrentItem(
+		event.target.closest(".HyperMD-list-line"),
+		event.target.cmView.editorView
+	);
 
 	_.forEach(allLines, (line, i) => {
 		line.classList.add("drag-over");
@@ -242,7 +267,7 @@ export default class DragNDropPlugin extends Plugin {
 		const app = this.app;
 		const settings = await this.loadSettings();
 		this.addSettingTab(new DragNDropSettings(this.app, this));
-		this.registerEditorExtension(dragLineMarker);
+		this.registerEditorExtension(dragLineMarker(app));
 		let cmdPressed = false;
 		this.registerEditorExtension(
 			EditorView.domEventHandlers({
@@ -300,8 +325,6 @@ class DragNDropSettings extends PluginSettingTab {
 		});
 
 		const addDropdownVariants = (settingName) => (dropDown) => {
-			console.log("set value", this.plugin.settings[settingName]);
-
 			dropDown.addOption("none", "Do nothing");
 			dropDown.addOption("embed", "Embed link");
 			dropDown.addOption("copy", "Copy block");
