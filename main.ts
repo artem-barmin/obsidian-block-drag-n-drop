@@ -6,12 +6,31 @@ import { unified } from "unified";
 import remarkParse from "remark-parse";
 import { visit } from "unist-util-visit";
 import _ from "lodash";
+import crypto from "crypto";
+import LRU from "lru-cache";
 
 function generateId(): string {
 	return Math.random().toString(36).substr(2, 6);
 }
 
-function findListItem(text, line, itemType) {
+function checkCache(cache, text, line, itemType) {
+	if (!cache) return null;
+	const textHash = crypto.createHash("md5").update(text).digest("hex");
+	const key = `${textHash}-${line}-${itemType}`;
+	return cache.get(key);
+}
+
+function putCache(cache, text, line, itemType, item) {
+	if (!cache) return item;
+	const textHash = crypto.createHash("md5").update(text).digest("hex");
+	const key = `${textHash}-${line}-${itemType}`;
+	cache.set(key, item);
+	return item;
+}
+
+function findListItem(text, line, itemType, cache) {
+	if (checkCache(cache, text, line, itemType))
+		return checkCache(cache, text, line, itemType);
 	const ast = unified().use(remarkParse).parse(text);
 	const allItems = [];
 	visit(ast, itemType, (node, index, parent) => {
@@ -25,7 +44,7 @@ function findListItem(text, line, itemType) {
 				height: end - start,
 			});
 	});
-	return _.minBy(allItems, "height");
+	return putCache(cache, text, line, itemType, _.minBy(allItems, "height"));
 }
 
 function copyItemLinesToDragContainer(app, line, drag) {
@@ -223,18 +242,24 @@ function processDrop(app, event, settings) {
 	}
 }
 
-function getAllLinesForCurrentItem(lineDom, targetEditor) {
+function getAllLinesForCurrentItem(lineDom, targetEditor, cache) {
 	const doc = targetEditor.state.doc;
 	const posAtLine = targetEditor.posAtDOM(lineDom);
 	const targetLine = doc.lineAt(posAtLine);
 	const editorState = targetEditor.state.toJSON().doc;
 
-	const targetItem = findListItem(editorState, targetLine.number, "listItem");
+	const targetItem = findListItem(
+		editorState,
+		targetLine.number,
+		"listItem",
+		cache
+	);
 
 	const insertPositionItem = findListItem(
 		editorState,
 		targetLine.number,
-		"paragraph"
+		"paragraph",
+		cache
 	);
 	const targetItemLastLine =
 		insertPositionItem?.node?.position?.end?.line || targetLine.number;
@@ -250,10 +275,11 @@ function getAllLinesForCurrentItem(lineDom, targetEditor) {
 		.filter(({ line }) => !!line);
 }
 
-function highlightWholeItem(event) {
+function highlightWholeItem(event, cache) {
 	const allLines = getAllLinesForCurrentItem(
 		event.target.closest(".HyperMD-list-line"),
-		event.target.cmView.editorView
+		event.target.cmView.editorView,
+		cache
 	);
 
 	_.forEach(allLines, ({ line, isTargetLine }) => {
@@ -280,6 +306,7 @@ export default class DragNDropPlugin extends Plugin {
 	async onload() {
 		const app = this.app;
 		const settings = await this.loadSettings();
+		const cache = new LRU({ max: 1000 });
 		this.addSettingTab(new DragNDropSettings(this.app, this));
 		this.registerEditorExtension(dragLineMarker(app));
 		this.registerEditorExtension(
@@ -287,7 +314,7 @@ export default class DragNDropPlugin extends Plugin {
 				dragover(event, view) {
 					removeAllClasses("drag-over");
 					removeAllClasses("drag-last");
-					highlightWholeItem(event);
+					highlightWholeItem(event, cache);
 					event.preventDefault();
 				},
 				dragleave(event, view) {
