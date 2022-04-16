@@ -9,6 +9,7 @@
 -   [x] Automatic reference link generation for dragged block
 -   [x] Live editor support
 -   [x] Multi-line list items support
+-   [x] Visual guidance during dragging
 
 # Roadmap
 
