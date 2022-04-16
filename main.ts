@@ -99,12 +99,16 @@ function getBlock(app, line, file) {
 		from: block.position.end.offset,
 		insert: spacer + "^" + id,
 	};
+	const fromLine = _.minBy(allChildren, "position.start.line").position.start;
+	const toLine = _.maxBy(allChildren, "position.end.line").position.end;
 
 	return {
 		...block,
+		fromLine,
+		toLine,
 		id: block.id || id,
 		children: allChildren,
-		changes,
+		changes: block.id ? [] : [changes],
 	};
 }
 
@@ -139,22 +143,22 @@ function processDrop(app, event, settings) {
 
 	if (type === "none") return;
 
-	const text = sourceEditor.getValue();
-	const item = findListItem(text, sourceLineNum, "listItem");
+	const item = getBlock(app, sourceLineNum - 1, view.file);
+	const targetItem = getBlock(
+		app,
+		targetLine.number - 1,
+		findFile(app, targetEditor)
+	);
 	if (item) {
-		const from = item.node.position.start.offset;
-		const to = item.node.position.end.offset;
 		let operations;
 
-		const targetItem = findListItem(
-			targetEditor.state.toJSON().doc,
-			targetLine.number,
-			"paragraph"
-		);
-		const targetItemLastLine =
-			targetItem?.node?.position?.end?.offset || targetLine.to;
+		const targetItemLastLine = targetItem.position.end.offset;
 
 		if (type === "move" || type === "copy") {
+			const from = item.fromLine.offset;
+			const to = item.toLine.offset;
+
+			const text = sourceEditor.getValue();
 			const sourceLine = sourceEditor.cm.state.doc.lineAt(from);
 
 			const textToInsert = "\n" + text.slice(sourceLine.from, to);
@@ -188,7 +192,7 @@ function processDrop(app, event, settings) {
 				target: [insertOp],
 			};
 		} else if (type === "embed") {
-			const { id, changes } = getBlock(app, sourceLineNum - 1, view.file);
+			const { id, changes } = item;
 			const insertBlockOp = {
 				from: targetItemLastLine,
 				insert: ` ![[${view.file.basename}#^${id}]]`,
@@ -208,23 +212,25 @@ function processDrop(app, event, settings) {
 	}
 }
 
-function getAllLinesForCurrentItem(app, lineDom, targetEditor) {
-	const doc = targetEditor.state.doc;
-	const posAtLine = targetEditor.posAtDOM(lineDom);
-	const targetLine = doc.lineAt(posAtLine);
-
+function findFile(app, targetEditor) {
 	const leafs = app.workspace.getLeavesOfType("markdown");
 	const targetLeaf = _.find(
 		leafs,
 		(leaf) => leaf.view.editor.cm === targetEditor
 	);
-	const targetFile = targetLeaf.view.file;
+	return targetLeaf.view.file;
+}
+
+function getAllLinesForCurrentItem(app, lineDom, targetEditor) {
+	const doc = targetEditor.state.doc;
+	const posAtLine = targetEditor.posAtDOM(lineDom);
+	const targetLine = doc.lineAt(posAtLine);
+
+	const targetFile = findFile(app, targetEditor);
 	const block = getBlock(app, targetLine.number - 1, targetFile);
-	const fromLine = _.min(_.map(block.children, "position.start.line")) + 1;
-	const toLine = _.max(_.map(block.children, "position.end.line")) + 1;
 	const targetItemLastLine = block.position.end.line + 1;
 
-	return _.range(fromLine, toLine + 1)
+	return _.range(block.fromLine.line + 1, block.toLine.line + 1 + 1)
 		.map((lineNum) => ({
 			line: targetEditor.domAtPos(doc.line(lineNum).from).node,
 			isTargetLine: lineNum === targetItemLastLine,
@@ -277,7 +283,7 @@ export default class DragNDropPlugin extends Plugin {
 					removeAllClasses("drag-last");
 				},
 				drop(event, viewDrop) {
-					// processDrop(app, event, settings);
+					processDrop(app, event, settings);
 				},
 			})
 		);
