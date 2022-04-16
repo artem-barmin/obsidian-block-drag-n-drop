@@ -2,49 +2,10 @@
 import { Plugin, MarkdownView, PluginSettingTab, Setting } from "obsidian";
 import { gutter, GutterMarker } from "@codemirror/gutter";
 import { EditorView } from "@codemirror/view";
-import { unified } from "unified";
-import remarkParse from "remark-parse";
-import { visit } from "unist-util-visit";
 import _ from "lodash";
-import crypto from "crypto";
-import LRU from "lru-cache";
 
 function generateId(): string {
 	return Math.random().toString(36).substr(2, 6);
-}
-
-function checkCache(cache, text, line, itemType) {
-	if (!cache) return null;
-	const textHash = crypto.createHash("md5").update(text).digest("hex");
-	const key = `${textHash}-${line}-${itemType}`;
-	return cache.get(key);
-}
-
-function putCache(cache, text, line, itemType, item) {
-	if (!cache) return item;
-	const textHash = crypto.createHash("md5").update(text).digest("hex");
-	const key = `${textHash}-${line}-${itemType}`;
-	cache.set(key, item);
-	return item;
-}
-
-function findListItem(text, line, itemType, cache) {
-	if (checkCache(cache, text, line, itemType))
-		return checkCache(cache, text, line, itemType);
-	const ast = unified().use(remarkParse).parse(text);
-	const allItems = [];
-	visit(ast, itemType, (node, index, parent) => {
-		const start = node.position.start.line;
-		const end = node.position.end.line;
-		if (start <= line && end >= line)
-			allItems.push({
-				node,
-				parent,
-				index,
-				height: end - start,
-			});
-	});
-	return putCache(cache, text, line, itemType, _.minBy(allItems, "height"));
 }
 
 function copyItemLinesToDragContainer(app, line, drag) {
@@ -81,7 +42,7 @@ const dragHandle = (line, app) =>
 			drag.setAttribute("draggable", true);
 			drag.addEventListener("dragstart", (e) => {
 				e.dataTransfer.setData("line", line);
-				copyItemLinesToDragContainer(app, line, drag);
+				// copyItemLinesToDragContainer(app, line, drag);
 			});
 			return drag;
 		}
@@ -108,6 +69,19 @@ function shouldInsertAfter(block) {
 	}
 }
 
+function getAllChildrensOfBlock(parents, allItems) {
+	if (!parents.length) return [];
+
+	const parentIndexes = new Set(
+		_.map(parents, (parent) => allItems.indexOf(parent))
+	);
+	const childrens = _.filter(allItems, ({ parent }) =>
+		parentIndexes.has(parent)
+	);
+	const nestedChildrens = getAllChildrensOfBlock(childrens, allItems);
+	return [...parents, ...childrens, ...nestedChildrens];
+}
+
 function getBlock(app, line, file) {
 	const fileCache = app.metadataCache.getFileCache(file);
 	const findSection = (section) => {
@@ -117,28 +91,24 @@ function getBlock(app, line, file) {
 		);
 	};
 
-	let block = (fileCache?.sections || []).find(findSection);
-	if (block?.type === "list") {
-		block = (fileCache?.listItems || []).find(findSection);
-	} else if (block?.type === "heading") {
-		block = fileCache.headings.find((heading) => {
-			return heading.position.start.line === block.position.start.line;
-		});
-	}
-
-	// return block id if it exists
-	if (block.id) return { ...block, changes: [] };
+	const block = (fileCache?.listItems || []).find(findSection);
+	const allChildren = _.uniq(
+		getAllChildrensOfBlock([block], fileCache.listItems)
+	);
 
 	// generate and write block id
 	const id = generateId();
 	const spacer = shouldInsertAfter(block) ? "\n\n" : " ";
+	const changes = {
+		from: block.position.end.offset,
+		insert: spacer + "^" + id,
+	};
 
 	return {
 		...block,
-		id,
-		changes: [
-			{ from: block.position.end.offset, insert: spacer + "^" + id },
-		],
+		id: block.id || id,
+		children: allChildren,
+		changes,
 	};
 }
 
@@ -242,32 +212,23 @@ function processDrop(app, event, settings) {
 	}
 }
 
-function getAllLinesForCurrentItem(lineDom, targetEditor, cache) {
+function getAllLinesForCurrentItem(app, lineDom, targetEditor) {
 	const doc = targetEditor.state.doc;
 	const posAtLine = targetEditor.posAtDOM(lineDom);
 	const targetLine = doc.lineAt(posAtLine);
-	const editorState = targetEditor.state.toJSON().doc;
 
-	const targetItem = findListItem(
-		editorState,
-		targetLine.number,
-		"listItem",
-		cache
+	const leafs = app.workspace.getLeavesOfType("markdown");
+	const targetLeaf = _.find(
+		leafs,
+		(leaf) => leaf.view.editor.cm === targetEditor
 	);
+	const targetFile = targetLeaf.view.file;
+	const block = getBlock(app, targetLine.number - 1, targetFile);
+	const fromLine = _.min(_.map(block.children, "position.start.line")) + 1;
+	const toLine = _.max(_.map(block.children, "position.end.line")) + 1;
+	const targetItemLastLine = block.position.end.line + 1;
 
-	const insertPositionItem = findListItem(
-		editorState,
-		targetLine.number,
-		"paragraph",
-		cache
-	);
-	const targetItemLastLine =
-		insertPositionItem?.node?.position?.end?.line || targetLine.number;
-
-	return _.range(
-		targetItem.node.position.start.line,
-		targetItem.node.position.end.line + 1
-	)
+	return _.range(fromLine, toLine + 1)
 		.map((lineNum) => ({
 			line: targetEditor.domAtPos(doc.line(lineNum).from).node,
 			isTargetLine: lineNum === targetItemLastLine,
@@ -275,11 +236,11 @@ function getAllLinesForCurrentItem(lineDom, targetEditor, cache) {
 		.filter(({ line }) => !!line);
 }
 
-function highlightWholeItem(event, cache) {
+function highlightWholeItem(app, event) {
 	const allLines = getAllLinesForCurrentItem(
+		app,
 		event.target.closest(".HyperMD-list-line"),
-		event.target.cmView.editorView,
-		cache
+		event.target.cmView.editorView
 	);
 
 	_.forEach(allLines, ({ line, isTargetLine }) => {
@@ -297,16 +258,14 @@ const DEFAULT_SETTINGS = {
 
 function removeAllClasses(className) {
 	const allLines = document.querySelectorAll(`.${className}`);
-	_.forEach(allLines, (line) => {
-		line.classList.remove(className);
-	});
+	_.forEach(allLines, (line) => line.classList.remove(className));
 }
 
 export default class DragNDropPlugin extends Plugin {
 	async onload() {
 		const app = this.app;
+		console.log(app);
 		const settings = await this.loadSettings();
-		const cache = new LRU({ max: 1000 });
 		this.addSettingTab(new DragNDropSettings(this.app, this));
 		this.registerEditorExtension(dragLineMarker(app));
 		this.registerEditorExtension(
@@ -314,7 +273,7 @@ export default class DragNDropPlugin extends Plugin {
 				dragover(event, view) {
 					removeAllClasses("drag-over");
 					removeAllClasses("drag-last");
-					highlightWholeItem(event, cache);
+					highlightWholeItem(app, event);
 					event.preventDefault();
 				},
 				dragleave(event, view) {
@@ -322,7 +281,7 @@ export default class DragNDropPlugin extends Plugin {
 					removeAllClasses("drag-last");
 				},
 				drop(event, viewDrop) {
-					processDrop(app, event, settings);
+					// processDrop(app, event, settings);
 				},
 			})
 		);
