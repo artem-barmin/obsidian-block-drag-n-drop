@@ -238,11 +238,14 @@ function getAllLinesForCurrentItem(app, lineDom, targetEditor) {
 		.filter(({ line }) => !!line);
 }
 
-function highlightWholeItem(app, event) {
+function highlightWholeItem(app, target) {
+	removeAllClasses("drag-over");
+	removeAllClasses("drag-last");
+
 	const allLines = getAllLinesForCurrentItem(
 		app,
-		event.target.closest(".HyperMD-list-line"),
-		event.target.cmView.editorView
+		target.closest(".HyperMD-list-line"),
+		target.cmView.editorView
 	);
 
 	_.forEach(allLines, ({ line, isTargetLine }) => {
@@ -250,6 +253,8 @@ function highlightWholeItem(app, event) {
 		if (isTargetLine) line.classList.add("drag-last");
 	});
 }
+
+const highlightWholeItemThrottled = _.throttle(highlightWholeItem, 10);
 
 const DEFAULT_SETTINGS = {
 	simple_same_pane: "move",
@@ -273,9 +278,7 @@ export default class DragNDropPlugin extends Plugin {
 		this.registerEditorExtension(
 			EditorView.domEventHandlers({
 				dragover(event, view) {
-					removeAllClasses("drag-over");
-					removeAllClasses("drag-last");
-					highlightWholeItem(app, event);
+					highlightWholeItemThrottled(app, event.target);
 					event.preventDefault();
 				},
 				dragleave(event, view) {
