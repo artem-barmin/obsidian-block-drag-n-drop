@@ -21,17 +21,16 @@ settings:
 */
 
 .dnd-render-draggable-content .dnd-gutter-marker {
-    display: none;
+    color:rgba(0, 0, 0, 0)
+}
+
+.dnd-render-draggable-content .dnd-drag-container {
+    color: rgba(0, 0, 0, 1)
 }
 
 .dnd-gutter-marker {
-    /* opacity: 0; */
     color: var(--dnd-gutter-handle);
     cursor: pointer;
-}
-
-.dnd-gutter-marker:hover {
-    opacity: 1;
 }
 
 .drag-over {
