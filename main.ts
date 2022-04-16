@@ -14,7 +14,7 @@ function copyItemLinesToDragContainer(app, line, drag) {
 	const targetEditor = view.editor.cm;
 	const lineHandle = targetEditor.state.doc.line(line);
 	const lineDom = targetEditor.domAtPos(lineHandle.from).node;
-	const lines = getAllLinesForCurrentItem(lineDom, targetEditor);
+	const lines = getAllLinesForCurrentItem(app, lineDom, targetEditor);
 
 	const container = document.createElement("div");
 	container.className =
@@ -42,7 +42,7 @@ const dragHandle = (line, app) =>
 			drag.setAttribute("draggable", true);
 			drag.addEventListener("dragstart", (e) => {
 				e.dataTransfer.setData("line", line);
-				// copyItemLinesToDragContainer(app, line, drag);
+				copyItemLinesToDragContainer(app, line, drag);
 			});
 			return drag;
 		}
@@ -72,12 +72,8 @@ function shouldInsertAfter(block) {
 function getAllChildrensOfBlock(parents, allItems) {
 	if (!parents.length) return [];
 
-	const parentIndexes = new Set(
-		_.map(parents, (parent) => allItems.indexOf(parent))
-	);
-	const childrens = _.filter(allItems, ({ parent }) =>
-		parentIndexes.has(parent)
-	);
+	const idx = new Set(_.map(parents, (parent) => allItems.indexOf(parent)));
+	const childrens = _.filter(allItems, ({ parent }) => idx.has(parent));
 	const nestedChildrens = getAllChildrensOfBlock(childrens, allItems);
 	return [...parents, ...childrens, ...nestedChildrens];
 }
