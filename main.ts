@@ -35,7 +35,7 @@ function copyItemLinesToDragContainer(app, line, drag) {
 
 const dragHandle = (line, app) =>
 	new (class extends GutterMarker {
-		toDOM() {
+		toDOM(editor) {
 			const drag = document.createElement("div");
 			drag.appendChild(document.createTextNode(":::"));
 			drag.className = "dnd-gutter-marker";
@@ -244,7 +244,7 @@ function highlightWholeItem(app, target) {
 
 	const allLines = getAllLinesForCurrentItem(
 		app,
-		target.closest(".HyperMD-list-line"),
+		target.closest(".cm-line"),
 		target.cmView.editorView
 	);
 
@@ -271,7 +271,6 @@ function removeAllClasses(className) {
 export default class DragNDropPlugin extends Plugin {
 	async onload() {
 		const app = this.app;
-		console.log(app);
 		const settings = await this.loadSettings();
 		this.addSettingTab(new DragNDropSettings(this.app, this));
 		this.registerEditorExtension(dragLineMarker(app));
