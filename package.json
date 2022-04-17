@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-block-drag-n-drop",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"description": "Allow moving/copying/and creation embeds with drag-n-drop just like Logseq or Roam",
 	"main": "main.js",
 	"scripts": {
