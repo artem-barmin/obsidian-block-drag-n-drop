@@ -3,6 +3,26 @@ import { Plugin, MarkdownView, PluginSettingTab, Setting } from "obsidian";
 import { gutter, GutterMarker } from "@codemirror/gutter";
 import { EditorView } from "@codemirror/view";
 import _ from "lodash";
+import { unified } from "unified";
+import remarkParse from "remark-parse";
+import { visit } from "unist-util-visit";
+
+function findListItem(text, line, itemType, cache) {
+	const ast = unified().use(remarkParse).parse(text);
+	const allItems = [];
+	visit(ast, itemType, (node, index, parent) => {
+		const start = node.position.start.line;
+		const end = node.position.end.line;
+		if (start <= line && end >= line)
+			allItems.push({
+				node,
+				parent,
+				index,
+				height: end - start,
+			});
+	});
+	return _.minBy(allItems, "height");
+}
 
 function generateId(): string {
 	return Math.random().toString(36).substr(2, 6);
@@ -98,6 +118,7 @@ function getBlock(app, line, fileCache) {
 	const block = (fileCache?.listItems || []).find((s) =>
 		findSection(s, line)
 	);
+	if (!block) return;
 	const allChildren = _.uniq(
 		getAllChildrensOfBlock([block], fileCache.listItems)
 	);
@@ -146,33 +167,39 @@ function processDrop(app, event, settings) {
 
 	const isSameEditor = sourceEditor.cm == targetEditor;
 
-	// if line was not moved - do nothing
-	if (targetLine.number === sourceLineNum && isSameEditor) return;
-
 	const type = defineOperationType(event, settings, isSameEditor);
 
 	if (type === "none") return;
 
-	const item = getBlock(
-		app,
-		sourceLineNum - 1,
-		app.metadataCache.getFileCache(view.file)
-	);
-	const targetItem = getBlock(
-		app,
-		targetLine.number - 1,
-		findFile(app, targetEditor)
-	);
+	const text = sourceEditor.getValue();
+	const item = findListItem(text, sourceLineNum, "listItem");
 	if (item) {
+		const from = item.node.position.start.offset;
+		const to = item.node.position.end.offset;
 		let operations;
 
-		const targetItemLastLine = targetItem.position.end.offset;
+		const targetItem = findListItem(
+			targetEditor.state.toJSON().doc,
+			targetLine.number,
+			"paragraph"
+		);
+
+		// if line was not moved or moved inside it's enclosing block - do nothing
+		if (isSameEditor) {
+			const pos = item.node.position;
+			if (
+				targetLine.number >= pos.start.line &&
+				targetLine.number <= pos.end.line
+			) {
+				console.log("Moved inside same block - do nothing");
+				return;
+			}
+		}
+
+		const targetItemLastLine =
+			targetItem.node.position.end.offset || targetLine.to;
 
 		if (type === "move" || type === "copy") {
-			const from = item.fromLine.offset;
-			const to = item.toLine.offset;
-
-			const text = sourceEditor.getValue();
 			const sourceLine = sourceEditor.cm.state.doc.lineAt(from);
 
 			const textToInsert = "\n" + text.slice(sourceLine.from, to);
@@ -206,7 +233,7 @@ function processDrop(app, event, settings) {
 				target: [insertOp],
 			};
 		} else if (type === "embed") {
-			const { id, changes } = item;
+			const { id, changes } = getBlock(app, sourceLineNum - 1, view.file);
 			const insertBlockOp = {
 				from: targetItemLastLine,
 				insert: ` ![[${view.file.basename}#^${id}]]`,
@@ -242,6 +269,8 @@ function getAllLinesForCurrentItem(app, lineDom, targetEditor) {
 
 	const targetFile = findFile(app, targetEditor);
 	const block = getBlock(app, targetLine.number - 1, targetFile);
+	if (!block) return;
+
 	const targetItemLastLine = block.position.end.line + 1;
 
 	return _.range(block.fromLine.line + 1, block.toLine.line + 1 + 1)
@@ -299,7 +328,10 @@ export default class DragNDropPlugin extends Plugin {
 					removeAllClasses("drag-last");
 				},
 				drop(event, viewDrop) {
+					highlightWholeItemThrottled.cancel();
 					processDrop(app, event, settings);
+					removeAllClasses("drag-over");
+					removeAllClasses("drag-last");
 				},
 			})
 		);
