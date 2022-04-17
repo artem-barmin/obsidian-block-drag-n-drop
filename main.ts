@@ -36,7 +36,12 @@ function copyItemLinesToDragContainer(app, line, drag) {
 const dragHandle = (line, app) =>
 	new (class extends GutterMarker {
 		toDOM(editor) {
+			const fileCache = findFile(app, editor);
+			const block = (fileCache?.sections || []).find((s) =>
+				findSection(s, line - 1)
+			);
 			const drag = document.createElement("div");
+			if (!block || block.type !== "list") return drag;
 			drag.appendChild(document.createTextNode(":::"));
 			drag.className = "dnd-gutter-marker";
 			drag.setAttribute("draggable", true);
@@ -72,22 +77,27 @@ function shouldInsertAfter(block) {
 function getAllChildrensOfBlock(parents, allItems) {
 	if (!parents.length) return [];
 
-	const idx = new Set(_.map(parents, (parent) => allItems.indexOf(parent)));
+	// Deconstruct hierarchy according to
+	// https://github.com/obsidianmd/obsidian-api/blob/036708710c4a4b652d8166c5929d5ba1ffb7fb91/obsidian.d.ts#L1581
+	// parentItem.position.start.line === childItem.parent
+	const idx = new Set(_.map(parents, (parent) => parent.position.start.line));
 	const childrens = _.filter(allItems, ({ parent }) => idx.has(parent));
+
 	const nestedChildrens = getAllChildrensOfBlock(childrens, allItems);
+
 	return [...parents, ...childrens, ...nestedChildrens];
 }
 
-function getBlock(app, line, file) {
-	const fileCache = app.metadataCache.getFileCache(file);
-	const findSection = (section) => {
-		return (
-			section.position.start.line <= line &&
-			section.position.end.line >= line
-		);
-	};
+function findSection(section, line) {
+	return (
+		section.position.start.line <= line && section.position.end.line >= line
+	);
+}
 
-	const block = (fileCache?.listItems || []).find(findSection);
+function getBlock(app, line, fileCache) {
+	const block = (fileCache?.listItems || []).find((s) =>
+		findSection(s, line)
+	);
 	const allChildren = _.uniq(
 		getAllChildrensOfBlock([block], fileCache.listItems)
 	);
@@ -143,7 +153,11 @@ function processDrop(app, event, settings) {
 
 	if (type === "none") return;
 
-	const item = getBlock(app, sourceLineNum - 1, view.file);
+	const item = getBlock(
+		app,
+		sourceLineNum - 1,
+		app.metadataCache.getFileCache(view.file)
+	);
 	const targetItem = getBlock(
 		app,
 		targetLine.number - 1,
@@ -216,9 +230,9 @@ function findFile(app, targetEditor) {
 	const leafs = app.workspace.getLeavesOfType("markdown");
 	const targetLeaf = _.find(
 		leafs,
-		(leaf) => leaf.view.editor.cm === targetEditor
+		(leaf) => leaf?.view?.editor?.cm === targetEditor
 	);
-	return targetLeaf.view.file;
+	if (targetLeaf) return app.metadataCache.getFileCache(targetLeaf.view.file);
 }
 
 function getAllLinesForCurrentItem(app, lineDom, targetEditor) {
