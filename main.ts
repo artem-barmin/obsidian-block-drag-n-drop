@@ -335,7 +335,9 @@ const DEFAULT_SETTINGS = {
 };
 
 const showHighlight = ViewPlugin.fromClass(class {}, {
-	decorations: (v) => lineHightlight,
+	decorations: (v) => {
+		return lineHightlight;
+	},
 });
 
 export default class DragNDropPlugin extends Plugin {
