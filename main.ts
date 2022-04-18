@@ -6,6 +6,12 @@ import _ from "lodash";
 import { unified } from "unified";
 import remarkParse from "remark-parse";
 import { visit } from "unist-util-visit";
+import { Decoration } from "@codemirror/view";
+import { RangeSetBuilder } from "@codemirror/rangeset";
+import { ViewPlugin, DecorationSet, ViewUpdate } from "@codemirror/view";
+
+const dragHighlight = Decoration.line({ attributes: { class: "drag-over" } });
+const dragDestination = Decoration.line({ attributes: { class: "drag-last" } });
 
 function findListItem(text, line, itemType, cache) {
 	const ast = unified().use(remarkParse).parse(text);
@@ -44,7 +50,9 @@ function copyItemLinesToDragContainer(app, line, drag) {
 	);
 	if (cmContent)
 		container.setAttribute("style", cmContent.getAttribute("style"));
-	lines.forEach(({ line }) => container.appendChild(line.cloneNode(true)));
+	lines.forEach(({ lineDom }) =>
+		container.appendChild(lineDom.cloneNode(true))
+	);
 	drag.appendChild(container);
 	document.body.classList.add("dnd-render-draggable-content");
 	setTimeout(() => {
@@ -233,7 +241,12 @@ function processDrop(app, event, settings) {
 				target: [insertOp],
 			};
 		} else if (type === "embed") {
-			const { id, changes } = getBlock(app, sourceLineNum - 1, view.file);
+			const sourceFile = findFile(app, sourceEditor.cm);
+			const { id, changes } = getBlock(
+				app,
+				sourceLineNum - 1,
+				sourceFile
+			);
 			const insertBlockOp = {
 				from: targetItemLastLine,
 				insert: ` ![[${view.file.basename}#^${id}]]`,
@@ -275,29 +288,44 @@ function getAllLinesForCurrentItem(app, lineDom, targetEditor) {
 
 	return _.range(block.fromLine.line + 1, block.toLine.line + 1 + 1)
 		.map((lineNum) => ({
-			line: targetEditor.domAtPos(doc.line(lineNum).from).node,
+			lineDom: targetEditor.domAtPos(doc.line(lineNum).from).node,
+			line: doc.line(lineNum),
 			isTargetLine: lineNum === targetItemLastLine,
 		}))
 		.filter(({ line }) => !!line);
 }
 
-function highlightWholeItem(app, target) {
-	removeAllClasses("drag-over");
-	removeAllClasses("drag-last");
-
-	const allLines = getAllLinesForCurrentItem(
-		app,
-		target.closest(".cm-line"),
-		target.cmView.editorView
-	);
-
-	_.forEach(allLines, ({ line, isTargetLine }) => {
-		line.classList.add("drag-over");
-		if (isTargetLine) line.classList.add("drag-last");
-	});
+function emptyRange() {
+	return new RangeSetBuilder().finish();
 }
 
-const highlightWholeItemThrottled = _.throttle(highlightWholeItem, 10);
+let lineHightlight = emptyRange();
+
+function highlightWholeItem(app, target) {
+	try {
+		const allLines = getAllLinesForCurrentItem(
+			app,
+			target.closest(".cm-line"),
+			target.cmView.editorView
+		);
+
+		const builder = new RangeSetBuilder();
+		_.forEach(allLines, ({ line, isTargetLine }) => {
+			builder.add(line.from, line.from, dragHighlight);
+			if (isTargetLine)
+				builder.add(line.from, line.from, dragDestination);
+		});
+		lineHightlight = builder.finish();
+	} catch (e) {
+		if (
+			e.message.match(
+				/Trying to find position for a DOM position outside of the document/
+			)
+		)
+			return;
+		throw e;
+	}
+}
 
 const DEFAULT_SETTINGS = {
 	simple_same_pane: "move",
@@ -306,10 +334,9 @@ const DEFAULT_SETTINGS = {
 	alt: "none",
 };
 
-function removeAllClasses(className) {
-	const allLines = document.querySelectorAll(`.${className}`);
-	_.forEach(allLines, (line) => line.classList.remove(className));
-}
+const showHighlight = ViewPlugin.fromClass(class {}, {
+	decorations: (v) => lineHightlight,
+});
 
 export default class DragNDropPlugin extends Plugin {
 	async onload() {
@@ -317,21 +344,19 @@ export default class DragNDropPlugin extends Plugin {
 		const settings = await this.loadSettings();
 		this.addSettingTab(new DragNDropSettings(this.app, this));
 		this.registerEditorExtension(dragLineMarker(app));
+		this.registerEditorExtension(showHighlight);
 		this.registerEditorExtension(
 			EditorView.domEventHandlers({
 				dragover(event, view) {
-					highlightWholeItemThrottled(app, event.target);
 					event.preventDefault();
 				},
-				dragleave(event, view) {
-					removeAllClasses("drag-over");
-					removeAllClasses("drag-last");
+				dragenter(event, view) {
+					highlightWholeItem(app, event.target);
+					event.preventDefault();
 				},
 				drop(event, viewDrop) {
-					highlightWholeItemThrottled.cancel();
 					processDrop(app, event, settings);
-					removeAllClasses("drag-over");
-					removeAllClasses("drag-last");
+					lineHightlight = emptyRange();
 				},
 			})
 		);
