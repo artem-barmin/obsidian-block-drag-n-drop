@@ -263,6 +263,7 @@ function processDrop(app, event, settings) {
 			sourceEditor.cm.dispatch({ changes: source });
 			targetEditor.dispatch({ changes: target });
 		}
+		targetEditor.focus();
 	}
 }
 
