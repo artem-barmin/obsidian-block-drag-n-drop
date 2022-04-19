@@ -1,4 +1,14 @@
-import { Plugin, MarkdownView, PluginSettingTab, Setting } from "obsidian";
+import {
+	Plugin,
+	MarkdownView,
+	PluginSettingTab,
+	Setting,
+	App,
+	CachedMetadata,
+	ListItemCache,
+	SectionCache,
+	DropdownComponent,
+} from "obsidian";
 import { gutter, GutterMarker } from "@codemirror/gutter";
 import { EditorView } from "@codemirror/view";
 import _ from "lodash";
@@ -7,12 +17,16 @@ import remarkParse from "remark-parse";
 import { visit } from "unist-util-visit";
 import { Decoration } from "@codemirror/view";
 import { RangeSetBuilder } from "@codemirror/rangeset";
-import { ViewPlugin, DecorationSet, ViewUpdate } from "@codemirror/view";
+import { ViewPlugin, DecorationSet, Line } from "@codemirror/view";
 
 const dragHighlight = Decoration.line({ attributes: { class: "drag-over" } });
 const dragDestination = Decoration.line({ attributes: { class: "drag-last" } });
 
-function findListItem(text, line, itemType) {
+function findListItem(
+	text: string,
+	line: number,
+	itemType: "listItem" | "paragraph"
+) {
 	const ast = unified().use(remarkParse).parse(text);
 	const allItems = [];
 	visit(ast, itemType, (node, index, parent) => {
@@ -33,7 +47,7 @@ function generateId(): string {
 	return Math.random().toString(36).substr(2, 6);
 }
 
-function copyItemLinesToDragContainer(app, line, drag) {
+function copyItemLinesToDragContainer(app: App, line: number, drag: Element) {
 	const view = app.workspace.getActiveViewOfType(MarkdownView);
 	if (!view || !view.editor) return;
 	const targetEditor = view.editor.cm;
@@ -44,11 +58,14 @@ function copyItemLinesToDragContainer(app, line, drag) {
 	const container = document.createElement("div");
 	container.className =
 		"markdown-source-view mod-cm6 cm-content dnd-drag-container";
+
+	// copy tab-size from any editor to drag handle - to correctly indent items
 	const cmContent = document.querySelector(
 		".cm-contentContainer .cm-content"
 	);
 	if (cmContent)
 		container.setAttribute("style", cmContent.getAttribute("style"));
+
 	lines.forEach(({ lineDom }) =>
 		container.appendChild(lineDom.cloneNode(true))
 	);
@@ -60,7 +77,7 @@ function copyItemLinesToDragContainer(app, line, drag) {
 	}, 0);
 }
 
-const dragHandle = (line, app) =>
+const dragHandle = (line: number, app: App) =>
 	new (class extends GutterMarker {
 		toDOM(editor) {
 			const fileCache = findFile(app, editor);
@@ -71,37 +88,28 @@ const dragHandle = (line, app) =>
 			if (!block || block.type !== "list") return drag;
 			drag.appendChild(document.createTextNode(":::"));
 			drag.className = "dnd-gutter-marker";
-			drag.setAttribute("draggable", true);
+			drag.setAttribute("draggable", "true");
 			drag.addEventListener("dragstart", (e) => {
-				e.dataTransfer.setData("line", line);
+				e.dataTransfer.setData("line", `${line}`);
 				copyItemLinesToDragContainer(app, line, drag);
 			});
 			return drag;
 		}
 	})();
 
-const dragLineMarker = (app) =>
+const dragLineMarker = (app: App) =>
 	gutter({
-		lineMarker(view, line) {
+		lineMarker(view, line: Line) {
 			return line.from == line.to
 				? null
 				: dragHandle(view.state.doc.lineAt(line.from).number, app);
 		},
 	});
 
-function shouldInsertAfter(block) {
-	if (block.type) {
-		return [
-			"blockquote",
-			"code",
-			"table",
-			"comment",
-			"footnoteDefinition",
-		].includes(block.type);
-	}
-}
-
-function getAllChildrensOfBlock(parents, allItems) {
+function getAllChildrensOfBlock(
+	parents: ListItemCache[],
+	allItems: ListItemCache[]
+): ListItemCache[] {
 	if (!parents.length) return [];
 
 	// Deconstruct hierarchy according to
@@ -115,13 +123,13 @@ function getAllChildrensOfBlock(parents, allItems) {
 	return [...parents, ...childrens, ...nestedChildrens];
 }
 
-function findSection(section, line) {
+function findSection(section: ListItemCache | SectionCache, line: number) {
 	return (
 		section.position.start.line <= line && section.position.end.line >= line
 	);
 }
 
-function getBlock(app, line, fileCache) {
+function getBlock(line: number, fileCache: CachedMetadata) {
 	const block = (fileCache?.listItems || []).find((s) =>
 		findSection(s, line)
 	);
@@ -132,10 +140,9 @@ function getBlock(app, line, fileCache) {
 
 	// generate and write block id
 	const id = generateId();
-	const spacer = shouldInsertAfter(block) ? "\n\n" : " ";
 	const changes = {
 		from: block.position.end.offset,
-		insert: spacer + "^" + id,
+		insert: "^" + id,
 	};
 	const fromLine = _.minBy(allChildren, "position.start.line").position.start;
 	const toLine = _.maxBy(allChildren, "position.end.line").position.end;
@@ -150,7 +157,11 @@ function getBlock(app, line, fileCache) {
 	};
 }
 
-function defineOperationType(event, settings, isSameEditor) {
+function defineOperationType(
+	event: DragEvent,
+	settings: DndPluginSettings,
+	isSameEditor: boolean
+) {
 	const modifier = event.shiftKey ? "shift" : event.altKey ? "alt" : "simple";
 
 	if (modifier === "simple") {
@@ -159,7 +170,7 @@ function defineOperationType(event, settings, isSameEditor) {
 	} else return settings[modifier];
 }
 
-function processDrop(app, event, settings) {
+function processDrop(app: App, event: DragEvent, settings: DndPluginSettings) {
 	const sourceLineNum = parseInt(event.dataTransfer.getData("line"), 10);
 	const targetLinePos = event.target.cmView.posAtStart;
 
@@ -212,7 +223,8 @@ function processDrop(app, event, settings) {
 			const textToInsert = "\n" + text.slice(sourceLine.from, to);
 
 			// adjust indent for each line of the source block
-			const computeIndent = (line) => line.text.match(/^\t*/)[0].length;
+			const computeIndent = (line: Line) =>
+				line.text.match(/^\t*/)[0].length;
 
 			const sourceIndent = computeIndent(sourceLine);
 			const targetIndent = computeIndent(targetLine);
@@ -241,11 +253,7 @@ function processDrop(app, event, settings) {
 			};
 		} else if (type === "embed") {
 			const sourceFile = findFile(app, sourceEditor.cm);
-			const { id, changes } = getBlock(
-				app,
-				sourceLineNum - 1,
-				sourceFile
-			);
+			const { id, changes } = getBlock(sourceLineNum - 1, sourceFile);
 			const insertBlockOp = {
 				from: targetItemLastLine,
 				insert: ` ![[${view.file.basename}#^${id}]]`,
@@ -266,7 +274,7 @@ function processDrop(app, event, settings) {
 	}
 }
 
-function findFile(app, targetEditor) {
+function findFile(app: App, targetEditor) {
 	const leafs = app.workspace.getLeavesOfType("markdown");
 	const targetLeaf = _.find(
 		leafs,
@@ -275,13 +283,13 @@ function findFile(app, targetEditor) {
 	if (targetLeaf) return app.metadataCache.getFileCache(targetLeaf.view.file);
 }
 
-function getAllLinesForCurrentItem(app, lineDom, targetEditor) {
+function getAllLinesForCurrentItem(app: App, lineDom: Element, targetEditor) {
 	const doc = targetEditor.state.doc;
 	const posAtLine = targetEditor.posAtDOM(lineDom);
 	const targetLine = doc.lineAt(posAtLine);
 
 	const targetFile = findFile(app, targetEditor);
-	const block = getBlock(app, targetLine.number - 1, targetFile);
+	const block = getBlock(targetLine.number - 1, targetFile);
 	if (!block) return;
 
 	const targetItemLastLine = block.position.end.line + 1;
@@ -295,13 +303,13 @@ function getAllLinesForCurrentItem(app, lineDom, targetEditor) {
 		.filter(({ line }) => !!line);
 }
 
-function emptyRange() {
-	return new RangeSetBuilder().finish();
+function emptyRange(): DecorationSet {
+	return new RangeSetBuilder<Decoration>().finish();
 }
 
-let lineHightlight = emptyRange();
+let lineHightlight: DecorationSet = emptyRange();
 
-function highlightWholeItem(app, target) {
+function highlightWholeItem(app: App, target: Element) {
 	try {
 		const allLines = getAllLinesForCurrentItem(
 			app,
@@ -309,7 +317,7 @@ function highlightWholeItem(app, target) {
 			target.cmView.editorView
 		);
 
-		const builder = new RangeSetBuilder();
+		const builder = new RangeSetBuilder<Decoration>();
 		_.forEach(allLines, ({ line, isTargetLine }) => {
 			builder.add(line.from, line.from, dragHighlight);
 			if (isTargetLine)
@@ -327,7 +335,16 @@ function highlightWholeItem(app, target) {
 	}
 }
 
-const DEFAULT_SETTINGS = {
+interface DndPluginSettings {
+	simple_same_pane: OperationType;
+	simple_different_panes: OperationType;
+	shift: OperationType;
+	alt: OperationType;
+}
+
+type OperationType = "move" | "embed" | "copy" | "none";
+
+const DEFAULT_SETTINGS: DndPluginSettings = {
 	simple_same_pane: "move",
 	simple_different_panes: "embed",
 	shift: "copy",
@@ -341,18 +358,20 @@ const showHighlight = ViewPlugin.fromClass(class {}, {
 });
 
 export default class DragNDropPlugin extends Plugin {
+	settings: DndPluginSettings;
+
 	async onload() {
 		const app = this.app;
 		const settings = await this.loadSettings();
 		const dragEventHandlers = EditorView.domEventHandlers({
-			dragover(event, view) {
+			dragover(event) {
 				event.preventDefault();
 			},
-			dragenter(event, view) {
+			dragenter(event) {
 				highlightWholeItem(app, event.target);
 				event.preventDefault();
 			},
-			drop(event, viewDrop) {
+			drop(event) {
 				processDrop(app, event, settings);
 				lineHightlight = emptyRange();
 			},
@@ -396,17 +415,19 @@ class DragNDropSettings extends PluginSettingTab {
 			text: "Modifiers",
 		});
 
-		const addDropdownVariants = (settingName) => (dropDown) => {
-			dropDown.addOption("none", "Do nothing");
-			dropDown.addOption("embed", "Embed link");
-			dropDown.addOption("copy", "Copy block");
-			dropDown.addOption("move", "Move block");
-			dropDown.setValue(this.plugin.settings[settingName]);
-			dropDown.onChange(async (value) => {
-				this.plugin.settings[settingName] = value;
-				await this.plugin.saveSettings();
-			});
-		};
+		const addDropdownVariants =
+			(settingName: keyof DndPluginSettings) =>
+			(dropDown: DropdownComponent) => {
+				dropDown.addOption("none", "Do nothing");
+				dropDown.addOption("embed", "Embed link");
+				dropDown.addOption("copy", "Copy block");
+				dropDown.addOption("move", "Move block");
+				dropDown.setValue(this.plugin.settings[settingName]);
+				dropDown.onChange(async (value: OperationType) => {
+					this.plugin.settings[settingName] = value;
+					await this.plugin.saveSettings();
+				});
+			};
 
 		new Setting(containerEl)
 			.setName("Drag'n'drop without modifiers in the same pane")
