@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Plugin, MarkdownView, PluginSettingTab, Setting } from "obsidian";
 import { gutter, GutterMarker } from "@codemirror/gutter";
 import { EditorView } from "@codemirror/view";
@@ -13,7 +12,7 @@ import { ViewPlugin, DecorationSet, ViewUpdate } from "@codemirror/view";
 const dragHighlight = Decoration.line({ attributes: { class: "drag-over" } });
 const dragDestination = Decoration.line({ attributes: { class: "drag-last" } });
 
-function findListItem(text, line, itemType, cache) {
+function findListItem(text, line, itemType) {
 	const ast = unified().use(remarkParse).parse(text);
 	const allItems = [];
 	visit(ast, itemType, (node, index, parent) => {
@@ -345,24 +344,25 @@ export default class DragNDropPlugin extends Plugin {
 	async onload() {
 		const app = this.app;
 		const settings = await this.loadSettings();
+		const dragEventHandlers = EditorView.domEventHandlers({
+			dragover(event, view) {
+				event.preventDefault();
+			},
+			dragenter(event, view) {
+				highlightWholeItem(app, event.target);
+				event.preventDefault();
+			},
+			drop(event, viewDrop) {
+				processDrop(app, event, settings);
+				lineHightlight = emptyRange();
+			},
+		});
 		this.addSettingTab(new DragNDropSettings(this.app, this));
-		this.registerEditorExtension(dragLineMarker(app));
-		this.registerEditorExtension(showHighlight);
-		this.registerEditorExtension(
-			EditorView.domEventHandlers({
-				dragover(event, view) {
-					event.preventDefault();
-				},
-				dragenter(event, view) {
-					highlightWholeItem(app, event.target);
-					event.preventDefault();
-				},
-				drop(event, viewDrop) {
-					processDrop(app, event, settings);
-					lineHightlight = emptyRange();
-				},
-			})
-		);
+		this.registerEditorExtension([
+			dragLineMarker(app),
+			showHighlight,
+			dragEventHandlers,
+		]);
 	}
 
 	async loadSettings() {

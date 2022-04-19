@@ -12,6 +12,7 @@
 	"author": "",
 	"license": "GPLV3",
 	"devDependencies": {
+		"@types/lodash": "^4.14.182",
 		"@types/node": "^16.11.6",
 		"@typescript-eslint/eslint-plugin": "^5.2.0",
 		"@typescript-eslint/parser": "^5.2.0",
