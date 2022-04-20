@@ -60,6 +60,7 @@ function generateId(): string {
 function copyItemLinesToDragContainer(app: App, line: number, drag: Element) {
 	const view = app.workspace.getActiveViewOfType(MarkdownView);
 	if (!view || !view.editor) return;
+	// @ts-ignore
 	const targetEditor: EditorView = view.editor.cm;
 	const lineHandle = targetEditor.state.doc.line(line);
 	const lineDom = targetEditor.domAtPos(lineHandle.from).node;
@@ -182,13 +183,16 @@ function defineOperationType(
 
 function processDrop(app: App, event: DragEvent, settings: DndPluginSettings) {
 	const sourceLineNum = parseInt(event.dataTransfer.getData("line"), 10);
+	// @ts-ignore
 	const targetLinePos = event.target.cmView.posAtStart;
 
 	const view = app.workspace.getActiveViewOfType(MarkdownView);
 
 	if (!view || !view.editor) return;
 
+	// @ts-ignore
 	const sourceEditor: EditorView = view.editor.cm;
+	// @ts-ignore
 	const targetEditor: EditorView = event.target.cmView.editorView;
 
 	const targetLine = targetEditor.state.doc.lineAt(targetLinePos);
@@ -288,6 +292,7 @@ function findFile(app: App, targetEditor: EditorView) {
 	const leafs = app.workspace.getLeavesOfType("markdown");
 	const targetLeaf = _.find(leafs, (leaf) => {
 		const view: MarkdownView = leaf.view as MarkdownView;
+		// @ts-ignore
 		return view?.editor?.cm === targetEditor;
 	});
 	if (targetLeaf)
@@ -331,6 +336,7 @@ function highlightWholeItem(app: App, target: Element) {
 		const allLines = getAllLinesForCurrentItem(
 			app,
 			target.closest(".cm-line"),
+			// @ts-ignore
 			target.cmView.editorView
 		);
 
