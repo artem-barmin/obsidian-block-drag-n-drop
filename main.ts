@@ -10,25 +10,36 @@ import {
 	DropdownComponent,
 } from "obsidian";
 import { gutter, GutterMarker } from "@codemirror/gutter";
-import { EditorView } from "@codemirror/view";
 import _ from "lodash";
 import { unified } from "unified";
 import remarkParse from "remark-parse";
-import { visit } from "unist-util-visit";
-import { Decoration } from "@codemirror/view";
+import { visit, Node } from "unist-util-visit";
 import { RangeSetBuilder } from "@codemirror/rangeset";
-import { ViewPlugin, DecorationSet, Line } from "@codemirror/view";
+import { Line } from "@codemirror/text";
+import {
+	Decoration,
+	EditorView,
+	ViewPlugin,
+	DecorationSet,
+	BlockInfo,
+} from "@codemirror/view";
 
 const dragHighlight = Decoration.line({ attributes: { class: "drag-over" } });
 const dragDestination = Decoration.line({ attributes: { class: "drag-last" } });
+
+type RemarkNode = {
+	node: Node;
+	parent: Node;
+	height: number;
+};
 
 function findListItem(
 	text: string,
 	line: number,
 	itemType: "listItem" | "paragraph"
-) {
+): RemarkNode {
 	const ast = unified().use(remarkParse).parse(text);
-	const allItems = [];
+	const allItems: RemarkNode[] = [];
 	visit(ast, itemType, (node, index, parent) => {
 		const start = node.position.start.line;
 		const end = node.position.end.line;
@@ -36,7 +47,6 @@ function findListItem(
 			allItems.push({
 				node,
 				parent,
-				index,
 				height: end - start,
 			});
 	});
@@ -50,7 +60,7 @@ function generateId(): string {
 function copyItemLinesToDragContainer(app: App, line: number, drag: Element) {
 	const view = app.workspace.getActiveViewOfType(MarkdownView);
 	if (!view || !view.editor) return;
-	const targetEditor = view.editor.cm;
+	const targetEditor: EditorView = view.editor.cm;
 	const lineHandle = targetEditor.state.doc.line(line);
 	const lineDom = targetEditor.domAtPos(lineHandle.from).node;
 	const lines = getAllLinesForCurrentItem(app, lineDom, targetEditor);
@@ -79,7 +89,7 @@ function copyItemLinesToDragContainer(app: App, line: number, drag: Element) {
 
 const dragHandle = (line: number, app: App) =>
 	new (class extends GutterMarker {
-		toDOM(editor) {
+		toDOM(editor: EditorView) {
 			const fileCache = findFile(app, editor);
 			const block = (fileCache?.sections || []).find((s) =>
 				findSection(s, line - 1)
@@ -99,7 +109,7 @@ const dragHandle = (line: number, app: App) =>
 
 const dragLineMarker = (app: App) =>
 	gutter({
-		lineMarker(view, line: Line) {
+		lineMarker(view: EditorView, line: BlockInfo) {
 			return line.from == line.to
 				? null
 				: dragHandle(view.state.doc.lineAt(line.from).number, app);
@@ -142,7 +152,7 @@ function getBlock(line: number, fileCache: CachedMetadata) {
 	const id = generateId();
 	const changes = {
 		from: block.position.end.offset,
-		insert: "^" + id,
+		insert: " ^" + id,
 	};
 	const fromLine = _.minBy(allChildren, "position.start.line").position.start;
 	const toLine = _.maxBy(allChildren, "position.end.line").position.end;
@@ -178,18 +188,18 @@ function processDrop(app: App, event: DragEvent, settings: DndPluginSettings) {
 
 	if (!view || !view.editor) return;
 
-	const sourceEditor = view.editor;
-	const targetEditor = event.target.cmView.editorView;
+	const sourceEditor: EditorView = view.editor.cm;
+	const targetEditor: EditorView = event.target.cmView.editorView;
 
 	const targetLine = targetEditor.state.doc.lineAt(targetLinePos);
 
-	const isSameEditor = sourceEditor.cm == targetEditor;
+	const isSameEditor = sourceEditor == targetEditor;
 
 	const type = defineOperationType(event, settings, isSameEditor);
 
 	if (type === "none") return;
 
-	const text = sourceEditor.getValue();
+	const text = view.editor.getValue();
 	const item = findListItem(text, sourceLineNum, "listItem");
 	if (item) {
 		const from = item.node.position.start.offset;
@@ -218,7 +228,7 @@ function processDrop(app: App, event: DragEvent, settings: DndPluginSettings) {
 			targetItem.node.position.end.offset || targetLine.to;
 
 		if (type === "move" || type === "copy") {
-			const sourceLine = sourceEditor.cm.state.doc.lineAt(from);
+			const sourceLine = sourceEditor.state.doc.lineAt(from);
 
 			const textToInsert = "\n" + text.slice(sourceLine.from, to);
 
@@ -252,7 +262,7 @@ function processDrop(app: App, event: DragEvent, settings: DndPluginSettings) {
 				target: [insertOp],
 			};
 		} else if (type === "embed") {
-			const sourceFile = findFile(app, sourceEditor.cm);
+			const sourceFile = findFile(app, sourceEditor);
 			const { id, changes } = getBlock(sourceLineNum - 1, sourceFile);
 			const insertBlockOp = {
 				from: targetItemLastLine,
@@ -264,26 +274,33 @@ function processDrop(app: App, event: DragEvent, settings: DndPluginSettings) {
 
 		console.log("Move item", type, operations);
 		const { source, target } = operations;
-		if (sourceEditor.cm == targetEditor)
-			sourceEditor.cm.dispatch({ changes: [...source, ...target] });
+		if (sourceEditor == targetEditor)
+			sourceEditor.dispatch({ changes: [...source, ...target] });
 		else {
-			sourceEditor.cm.dispatch({ changes: source });
+			sourceEditor.dispatch({ changes: source });
 			targetEditor.dispatch({ changes: target });
 		}
 		targetEditor.focus();
 	}
 }
 
-function findFile(app: App, targetEditor) {
+function findFile(app: App, targetEditor: EditorView) {
 	const leafs = app.workspace.getLeavesOfType("markdown");
-	const targetLeaf = _.find(
-		leafs,
-		(leaf) => leaf?.view?.editor?.cm === targetEditor
-	);
-	if (targetLeaf) return app.metadataCache.getFileCache(targetLeaf.view.file);
+	const targetLeaf = _.find(leafs, (leaf) => {
+		const view: MarkdownView = leaf.view as MarkdownView;
+		return view?.editor?.cm === targetEditor;
+	});
+	if (targetLeaf)
+		return app.metadataCache.getFileCache(
+			(targetLeaf.view as MarkdownView).file
+		);
 }
 
-function getAllLinesForCurrentItem(app: App, lineDom: Element, targetEditor) {
+function getAllLinesForCurrentItem(
+	app: App,
+	lineDom: globalThis.Node,
+	targetEditor: EditorView
+) {
 	const doc = targetEditor.state.doc;
 	const posAtLine = targetEditor.posAtDOM(lineDom);
 	const targetLine = doc.lineAt(posAtLine);
@@ -368,7 +385,8 @@ export default class DragNDropPlugin extends Plugin {
 				event.preventDefault();
 			},
 			dragenter(event) {
-				highlightWholeItem(app, event.target);
+				if (event.target instanceof Element)
+					highlightWholeItem(app, event.target);
 				event.preventDefault();
 			},
 			drop(event) {
