@@ -229,7 +229,7 @@ function processDrop(app: App, event: DragEvent, settings: DndPluginSettings) {
 		}
 
 		const targetItemLastLine =
-			targetItem.node.position.end.offset || targetLine.to;
+			targetItem?.node?.position?.end?.offset || targetLine.to;
 
 		if (type === "move" || type === "copy") {
 			const sourceLine = sourceEditor.state.doc.lineAt(from);
