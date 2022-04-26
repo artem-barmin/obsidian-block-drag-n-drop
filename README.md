@@ -53,3 +53,7 @@ You can activate this plugin within Obsidian by doing the following:
 ## Manual installation
 
 Download main.js, manifest.json, styles.css from the latest release and put them into <vault>/.obsidian/plugins/obsidian-outliner folder.
+
+# Limitations
+	
+Plugin was developed and tested only with Live preview editor. Legacy editor not supported
