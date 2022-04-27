@@ -35,8 +35,6 @@ You can change behavior for settings in the plugin settings tab.
 
 ## From within Obsidian
 
-_NOT YET AVAILABLE_
-
 You can activate this plugin within Obsidian by doing the following:
 
 -   Open Settings > Third-party plugin
@@ -45,12 +43,6 @@ You can activate this plugin within Obsidian by doing the following:
 -   Search for "Drag-n-Drop"
 -   Click Install
 -   Once installed, close the community plugins window and activate the newly installed plugin
-
-## BRAT
-
--   Install BRAT plugin
--   Add repository _artem-barmin/obsidian-block-drag-n-drop_
--   Enable it
 
 ## Manual installation
 
