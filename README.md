@@ -4,16 +4,18 @@
 
 # Features
 
--   [ ] Drag-n-drop for list items in the same pane and between different panes
--   [ ] 3 modes: move block, copy block, embed block
--   [ ] Automatic reference link generation for dragged block
--   [ ] Live editor support
--   [ ] Multi-line list items support
--   [ ] Visual guidance during dragging
+-   ✅  Drag-n-drop for list items in the same pane and between different panes
+-   ✅  3 modes: move block, copy block, embed block
+-   ✅  Automatic reference link generation for dragged block
+-   ✅  Live editor support
+-   ✅  Multi-line list items support
+-   ✅  Visual guidance during dragging
 
 # Roadmap
 
 -   [ ] Support for arbitrary block dragging - paragraphs, headings etc
+
+Feel free to create feature requests HERE: https://github.com/artem-barmin/obsidian-block-drag-n-drop/issues
 
 # How to use
 
