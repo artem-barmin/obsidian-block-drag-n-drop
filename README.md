@@ -4,12 +4,12 @@
 
 # Features
 
--   [x] Drag-n-drop for list items in the same pane and between different panes
--   [x] 3 modes: move block, copy block, embed block
--   [x] Automatic reference link generation for dragged block
--   [x] Live editor support
--   [x] Multi-line list items support
--   [x] Visual guidance during dragging
+-   [ ] Drag-n-drop for list items in the same pane and between different panes
+-   [ ] 3 modes: move block, copy block, embed block
+-   [ ] Automatic reference link generation for dragged block
+-   [ ] Live editor support
+-   [ ] Multi-line list items support
+-   [ ] Visual guidance during dragging
 
 # Roadmap
 
