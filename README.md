@@ -4,16 +4,18 @@
 
 # Features
 
--   [x] Drag-n-drop for list items in the same pane and between different panes
--   [x] 3 modes: move block, copy block, embed block
--   [x] Automatic reference link generation for dragged block
--   [x] Live editor support
--   [x] Multi-line list items support
--   [x] Visual guidance during dragging
+-   ✅  Drag-n-drop for list items in the same pane and between different panes
+-   ✅  3 modes: move block, copy block, embed block
+-   ✅  Automatic reference link generation for dragged block
+-   ✅  Live editor support
+-   ✅  Multi-line list items support
+-   ✅  Visual guidance during dragging
 
 # Roadmap
 
 -   [ ] Support for arbitrary block dragging - paragraphs, headings etc
+
+Feel free to create feature requests HERE: https://github.com/artem-barmin/obsidian-block-drag-n-drop/issues
 
 # How to use
 
@@ -33,8 +35,6 @@ You can change behavior for settings in the plugin settings tab.
 
 ## From within Obsidian
 
-_NOT YET AVAILABLE_
-
 You can activate this plugin within Obsidian by doing the following:
 
 -   Open Settings > Third-party plugin
@@ -44,12 +44,10 @@ You can activate this plugin within Obsidian by doing the following:
 -   Click Install
 -   Once installed, close the community plugins window and activate the newly installed plugin
 
-## BRAT
-
--   Install BRAT plugin
--   Add repository _artem-barmin/obsidian-block-drag-n-drop_
--   Enable it
-
 ## Manual installation
 
 Download main.js, manifest.json, styles.css from the latest release and put them into <vault>/.obsidian/plugins/obsidian-outliner folder.
+
+# Limitations
+	
+Plugin was developed and tested only with Live preview editor. Legacy editor not supported
