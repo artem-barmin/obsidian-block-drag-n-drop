@@ -1,5 +1,7 @@
 # Demo
 
+[Watch demo](demo/demo.gif)
+
 ![Demo](demo/demo.gif)
 
 # Features
