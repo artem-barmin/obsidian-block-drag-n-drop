@@ -1,4 +1,5 @@
-[![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active) [![GitHub release (latest by date)](https://img.shields.io/github/v/release/artem-barmin/obsidian-block-drag-n-drop/)](https://img.shields.io/github/v/release/artem-barmin/obsidian-block-drag-n-drop)
+[![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active) 
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/artem-barmin/obsidian-block-drag-n-drop)
 
 # Demo
 
