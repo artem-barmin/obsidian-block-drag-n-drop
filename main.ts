@@ -101,7 +101,7 @@ const dragHandle = (line: number, app: App) =>
 			// TODO: think how to move paragraphs
 			// if (!block || (block.type !== "list" && block.type !== "paragraph"))
 			// 	return drag;
-			drag.appendChild(document.createTextNode(":::"));
+			drag.appendChild(document.createTextNode("⋮⋮"));
 			drag.className = "dnd-gutter-marker";
 			drag.setAttribute("draggable", "true");
 			drag.addEventListener("dragstart", (e) => {
@@ -446,7 +446,7 @@ const showHighlight = ViewPlugin.fromClass(class {}, {
 
 const processDragOver = (element: HTMLElement, offsetX: number) => {
 	const itemIndent = parseInt(element.style.paddingLeft, 10);
-	if (itemIndent < offsetX - element.getBoundingClientRect().left)
+	if (itemIndent + 2 < offsetX - element.getBoundingClientRect().left)
 		highlightMode = "current";
 	else highlightMode = "parent";
 };
