@@ -5,12 +5,15 @@
 # Features
 
 -   ✅ Drag-n-drop for list items in the same pane and between different panes
--   ✅ 3 modes: move block, copy block, embed block
+-   ✅ 3 modes:
+    -   embed block - default for moving between different panes
+    -   move block - default for moving in the same pane
+    -   copy block - Shift + drag
+-   ✅ Ability to reorder items keeping their nested level(like Notion)
+    -   Drop to the **right** of intendation dot • to nest dragged item under the previous item
+    -   Drop to the **left** of intendation dot • to keep intendation level and just reorder items
 -   ✅ Automatic reference link generation for dragged block
 -   ✅ Live editor support
--   ✅ Multi-line list items support
--   ✅ Visual guidance during dragging
--   ✅ Ability to reorder items keeping their nested level
 
 # Roadmap
 
