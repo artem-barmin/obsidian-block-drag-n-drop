@@ -1,35 +1,43 @@
 :root {
-    --dnd-gutter-handle: red;
+    --dnd-gutter-handle: var(--interactive-accent);
 }
 
 /* @settings
-
 name: Drag'n-drop
 id: drag-n-drop
 settings:
     - 
-        id: my-title
+        id: dnd-gutter-handle-heading
         title: Handle settings
         type: heading
         level: 3
+        collapsed: false
     - 
         id: dnd-gutter-handle
         title: Gutter handle color
         type: variable-color
         format: hsl-split
-        default: red
+        default: rgb(0, 0, 0)
 */
 
+.cm-gutter .dnd-gutter-marker {
+    opacity: 50%;
+}
+
+.cm-gutter .dnd-gutter-marker:hover {    
+    opacity: 100%;
+}
+
 .dnd-render-draggable-content .dnd-gutter-marker {
-    color:rgba(0, 0, 0, 0)
+    color:rgba(0, 0, 0, 0) !important;
 }
 
 .dnd-render-draggable-content .dnd-drag-container {
-    color: rgba(0, 0, 0, 1)
+    color: rgba(0, 0, 0, 1) !important;
 }
 
 .dnd-gutter-marker {
-    color: var(--dnd-gutter-handle);
+    color: var(--dnd-gutter-handle) !important;
     cursor: pointer;
 }
 
