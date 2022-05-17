@@ -1,17 +1,16 @@
 # Demo
 
-[Watch demo](demo/demo.gif)
-
 ![Demo](demo/demo.gif)
 
 # Features
 
--   ✅  Drag-n-drop for list items in the same pane and between different panes
--   ✅  3 modes: move block, copy block, embed block
--   ✅  Automatic reference link generation for dragged block
--   ✅  Live editor support
--   ✅  Multi-line list items support
--   ✅  Visual guidance during dragging
+-   ✅ Drag-n-drop for list items in the same pane and between different panes
+-   ✅ 3 modes: move block, copy block, embed block
+-   ✅ Automatic reference link generation for dragged block
+-   ✅ Live editor support
+-   ✅ Multi-line list items support
+-   ✅ Visual guidance during dragging
+-   ✅ Ability to reorder items keeping their nested level
 
 # Roadmap
 
@@ -51,5 +50,5 @@ You can activate this plugin within Obsidian by doing the following:
 Download main.js, manifest.json, styles.css from the latest release and put them into <vault>/.obsidian/plugins/obsidian-outliner folder.
 
 # Limitations
-	
+
 Plugin was developed and tested only with Live preview editor. Legacy editor not supported

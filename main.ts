@@ -147,8 +147,8 @@ function findSection(section: ListItemCache | SectionCache, line: number) {
 function getBlock(line: number, fileCache: CachedMetadata) {
 	const block: ListItemCache | SectionCache = _.concat(
 		[],
-		fileCache?.listItems,
-		_.filter(fileCache?.sections, { type: "paragraph" })
+		fileCache?.listItems
+		// _.filter(fileCache?.sections, { type: "paragraph" })
 	).find((s) => findSection(s, line));
 	if (!block) return;
 
@@ -336,12 +336,18 @@ function getBlockForLine(
 	return getBlock(lineNumber, findFile(app, targetEditor));
 }
 
+type LineOfEditor = {
+	lineDom: globalThis.Node;
+	line: Line;
+	isTargetLine: boolean;
+};
+
 function getAllLinesForCurrentItem(
 	app: App,
 	lineNumber: number,
 	targetEditor: EditorView,
 	targetLine?: number
-) {
+): LineOfEditor[] {
 	const doc = targetEditor.state.doc;
 	const block = getBlockForLine(app, lineNumber, targetEditor);
 	if (!block) return;
@@ -368,7 +374,10 @@ type EditorHightlight = { current: DecorationSet; parent: DecorationSet };
 let lineHightlight: EditorHightlight = emptyRange();
 let highlightMode: "current" | "parent" = "current";
 
-function buildLineDecorations(allLines, dragDestination) {
+function buildLineDecorations(
+	allLines: LineOfEditor[],
+	dragDestination: Decoration
+) {
 	const builder = new RangeSetBuilder<Decoration>();
 	_.forEach(allLines, ({ line, isTargetLine }) => {
 		builder.add(line.from, line.from, dragHighlight);
