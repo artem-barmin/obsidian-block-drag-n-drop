@@ -29,11 +29,11 @@ settings:
 }
 
 .dnd-render-draggable-content .dnd-gutter-marker {
-    color:rgba(0, 0, 0, 0) !important;
+    opacity: 0;
 }
 
 .dnd-render-draggable-content .dnd-drag-container {
-    color: rgba(0, 0, 0, 1) !important;
+    color: var(--text-normal) !important;
 }
 
 .dnd-gutter-marker {
@@ -49,7 +49,7 @@ settings:
     background-color: rgba(255, 0, 0, 0.099);
 }
 
-.drag-last {
+.drag-last span:not(.cm-hmd-list-indent, .cm-indent), .drag-parent-last {
     border-bottom: 2px solid black;
 }
 

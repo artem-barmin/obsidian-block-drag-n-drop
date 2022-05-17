@@ -26,6 +26,9 @@ import {
 
 const dragHighlight = Decoration.line({ attributes: { class: "drag-over" } });
 const dragDestination = Decoration.line({ attributes: { class: "drag-last" } });
+const dragParentDestination = Decoration.line({
+	attributes: { class: "drag-parent-last" },
+});
 
 type RemarkNode = {
 	node: Node;
@@ -62,13 +65,11 @@ function copyItemLinesToDragContainer(app: App, line: number, drag: Element) {
 	if (!view || !view.editor) return;
 	// @ts-ignore
 	const targetEditor: EditorView = view.editor.cm;
-	const lineHandle = targetEditor.state.doc.line(line);
-	const lineDom = targetEditor.domAtPos(lineHandle.from).node;
-	const lines = getAllLinesForCurrentItem(app, lineDom, targetEditor);
+	const lines = getAllLinesForCurrentItem(app, line - 1, targetEditor);
 
 	const container = document.createElement("div");
 	container.className =
-		"markdown-source-view mod-cm6 cm-content dnd-drag-container";
+		"markdown-source-view mod-cm6 cm-content dnd-drag-container cm-s-obsidian";
 
 	// copy tab-size from any editor to drag handle - to correctly indent items
 	const cmContent = document.querySelector(
@@ -97,6 +98,9 @@ const dragHandle = (line: number, app: App) =>
 			);
 			const drag = document.createElement("div");
 			if (!block || block.type !== "list") return drag;
+			// TODO: think how to move paragraphs
+			// if (!block || (block.type !== "list" && block.type !== "paragraph"))
+			// 	return drag;
 			drag.appendChild(document.createTextNode(":::"));
 			drag.className = "dnd-gutter-marker";
 			drag.setAttribute("draggable", "true");
@@ -141,16 +145,20 @@ function findSection(section: ListItemCache | SectionCache, line: number) {
 }
 
 function getBlock(line: number, fileCache: CachedMetadata) {
-	const block = (fileCache?.listItems || []).find((s) =>
-		findSection(s, line)
-	);
+	const block: ListItemCache | SectionCache = _.concat(
+		[],
+		fileCache?.listItems,
+		_.filter(fileCache?.sections, { type: "paragraph" })
+	).find((s) => findSection(s, line));
 	if (!block) return;
+
+	// generate and write block id
+	const id = generateId();
+
 	const allChildren = _.uniq(
 		getAllChildrensOfBlock([block], fileCache.listItems)
 	);
 
-	// generate and write block id
-	const id = generateId();
 	const changes = {
 		from: block.position.end.offset,
 		insert: " ^" + id,
@@ -181,7 +189,12 @@ function defineOperationType(
 	} else return settings[modifier];
 }
 
-function processDrop(app: App, event: DragEvent, settings: DndPluginSettings) {
+function processDrop(
+	app: App,
+	event: DragEvent,
+	settings: DndPluginSettings,
+	dropMode: "current" | "parent"
+) {
 	const sourceLineNum = parseInt(event.dataTransfer.getData("line"), 10);
 	// @ts-ignore
 	const targetLinePos = event.target.cmView.posAtStart;
@@ -243,8 +256,15 @@ function processDrop(app: App, event: DragEvent, settings: DndPluginSettings) {
 			const sourceIndent = computeIndent(sourceLine);
 			const targetIndent = computeIndent(targetLine);
 
-			const addTabsNum = Math.max(targetIndent - sourceIndent + 1, 0);
-			const removeTabsNum = Math.max(sourceIndent - targetIndent - 1, 0);
+			const indentChange = dropMode === "current" ? 1 : 0;
+			const addTabsNum = Math.max(
+				targetIndent - sourceIndent + indentChange,
+				0
+			);
+			const removeTabsNum = Math.max(
+				sourceIndent - targetIndent - indentChange,
+				0
+			);
 
 			const removeTabsRegex = new RegExp(
 				"\n" + "\t".repeat(removeTabsNum),
@@ -276,7 +296,7 @@ function processDrop(app: App, event: DragEvent, settings: DndPluginSettings) {
 			operations = { source: [changes], target: [insertBlockOp] };
 		}
 
-		console.log("Move item", type, operations);
+		console.log("Move item ", { dropMode, type }, operations);
 		const { source, target } = operations;
 		if (sourceEditor == targetEditor)
 			sourceEditor.dispatch({ changes: [...source, ...target] });
@@ -301,20 +321,32 @@ function findFile(app: App, targetEditor: EditorView) {
 		);
 }
 
-function getAllLinesForCurrentItem(
-	app: App,
-	lineDom: globalThis.Node,
-	targetEditor: EditorView
-) {
+function DOMtoLine(lineDom: globalThis.Node, targetEditor: EditorView) {
 	const doc = targetEditor.state.doc;
 	const posAtLine = targetEditor.posAtDOM(lineDom);
 	const targetLine = doc.lineAt(posAtLine);
+	return targetLine.number - 1;
+}
 
-	const targetFile = findFile(app, targetEditor);
-	const block = getBlock(targetLine.number - 1, targetFile);
+function getBlockForLine(
+	app: App,
+	lineNumber: number,
+	targetEditor: EditorView
+) {
+	return getBlock(lineNumber, findFile(app, targetEditor));
+}
+
+function getAllLinesForCurrentItem(
+	app: App,
+	lineNumber: number,
+	targetEditor: EditorView,
+	targetLine?: number
+) {
+	const doc = targetEditor.state.doc;
+	const block = getBlockForLine(app, lineNumber, targetEditor);
 	if (!block) return;
 
-	const targetItemLastLine = block.position.end.line + 1;
+	const targetItemLastLine = targetLine || block.position.end.line + 1;
 
 	return _.range(block.fromLine.line + 1, block.toLine.line + 1 + 1)
 		.map((lineNum) => ({
@@ -325,28 +357,51 @@ function getAllLinesForCurrentItem(
 		.filter(({ line }) => !!line);
 }
 
-function emptyRange(): DecorationSet {
-	return new RangeSetBuilder<Decoration>().finish();
+function emptyRange(): EditorHightlight {
+	return {
+		current: new RangeSetBuilder<Decoration>().finish(),
+		parent: new RangeSetBuilder<Decoration>().finish(),
+	};
 }
 
-let lineHightlight: DecorationSet = emptyRange();
+type EditorHightlight = { current: DecorationSet; parent: DecorationSet };
+let lineHightlight: EditorHightlight = emptyRange();
+let highlightMode: "current" | "parent" = "current";
+
+function buildLineDecorations(allLines, dragDestination) {
+	const builder = new RangeSetBuilder<Decoration>();
+	_.forEach(allLines, ({ line, isTargetLine }) => {
+		builder.add(line.from, line.from, dragHighlight);
+		if (isTargetLine) builder.add(line.from, line.from, dragDestination);
+	});
+	return builder.finish();
+}
 
 function highlightWholeItem(app: App, target: Element) {
 	try {
-		const allLines = getAllLinesForCurrentItem(
-			app,
-			target.closest(".cm-line"),
-			// @ts-ignore
-			target.cmView.editorView
-		);
+		// @ts-ignore
+		const editor = target.cmView.editorView;
 
-		const builder = new RangeSetBuilder<Decoration>();
-		_.forEach(allLines, ({ line, isTargetLine }) => {
-			builder.add(line.from, line.from, dragHighlight);
-			if (isTargetLine)
-				builder.add(line.from, line.from, dragDestination);
-		});
-		lineHightlight = builder.finish();
+		// get all sub-items for current line
+		const line = DOMtoLine(target.closest(".cm-line"), editor);
+		const currentLines = getAllLinesForCurrentItem(app, line, editor);
+
+		// get all sub-items for parent line
+		const currentBlock = getBlockForLine(app, line, editor);
+		const parentLines =
+			currentBlock.parent > 0
+				? getAllLinesForCurrentItem(
+						app,
+						currentBlock.parent,
+						editor,
+						line + 1
+				  )
+				: currentLines;
+
+		lineHightlight = {
+			current: buildLineDecorations(currentLines, dragDestination),
+			parent: buildLineDecorations(parentLines, dragParentDestination),
+		};
 	} catch (e) {
 		if (
 			e.message.match(
@@ -376,9 +431,16 @@ const DEFAULT_SETTINGS: DndPluginSettings = {
 
 const showHighlight = ViewPlugin.fromClass(class {}, {
 	decorations: (v) => {
-		return lineHightlight;
+		return lineHightlight[highlightMode];
 	},
 });
+
+const processDragOver = (element: HTMLElement, offsetX: number) => {
+	const itemIndent = parseInt(element.style.paddingLeft, 10);
+	if (itemIndent < offsetX - element.getBoundingClientRect().left)
+		highlightMode = "current";
+	else highlightMode = "parent";
+};
 
 export default class DragNDropPlugin extends Plugin {
 	settings: DndPluginSettings;
@@ -388,6 +450,10 @@ export default class DragNDropPlugin extends Plugin {
 		const settings = await this.loadSettings();
 		const dragEventHandlers = EditorView.domEventHandlers({
 			dragover(event) {
+				if (event.target instanceof HTMLElement) {
+					const line = event.target.closest(".cm-line");
+					processDragOver(line as HTMLElement, event.clientX);
+				}
 				event.preventDefault();
 			},
 			dragenter(event) {
@@ -396,7 +462,7 @@ export default class DragNDropPlugin extends Plugin {
 				event.preventDefault();
 			},
 			drop(event) {
-				processDrop(app, event, settings);
+				processDrop(app, event, settings, highlightMode);
 				lineHightlight = emptyRange();
 			},
 		});
