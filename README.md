@@ -3,7 +3,7 @@
 
 # Demo
 
-![Demo](https://github.com/artem-barmin/obsidian-block-drag-n-drop/raw/master/demo/demo.gif)
+![Demo](https://raw.githubusercontent.com/artem-barmin/obsidian-block-drag-n-drop/master/demo/demo.gif)
 
 # Features
 
