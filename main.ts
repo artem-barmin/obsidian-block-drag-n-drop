@@ -9,19 +9,19 @@ import {
 	SectionCache,
 	DropdownComponent,
 } from "obsidian";
-import { gutter, GutterMarker } from "@codemirror/gutter";
 import _ from "lodash";
 import { unified } from "unified";
 import remarkParse from "remark-parse";
 import { visit, Node } from "unist-util-visit";
-import { RangeSetBuilder } from "@codemirror/rangeset";
-import { Line } from "@codemirror/text";
+import { RangeSetBuilder, Line } from "@codemirror/state";
 import {
 	Decoration,
 	EditorView,
 	ViewPlugin,
 	DecorationSet,
 	BlockInfo,
+	gutter,
+	GutterMarker,
 } from "@codemirror/view";
 
 const dragHighlight = Decoration.line({ attributes: { class: "drag-over" } });

@@ -28,6 +28,10 @@ settings:
     opacity: 100%;
 }
 
+.markdown-source-view.mod-cm6 .cm-gutters {
+    pointer-events: all;
+}
+
 .dnd-render-draggable-content .dnd-gutter-marker {
     opacity: 0;
 }
