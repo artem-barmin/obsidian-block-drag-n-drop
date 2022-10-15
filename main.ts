@@ -60,35 +60,6 @@ function generateId(): string {
 	return Math.random().toString(36).substr(2, 6);
 }
 
-function copyItemLinesToDragContainer(app: App, line: number, drag: Element) {
-	const view = app.workspace.getActiveViewOfType(MarkdownView);
-	if (!view || !view.editor) return;
-	// @ts-ignore
-	const targetEditor: EditorView = view.editor.cm;
-	const lines = getAllLinesForCurrentItem(app, line - 1, targetEditor);
-
-	const container = document.createElement("div");
-	container.className =
-		"markdown-source-view mod-cm6 cm-content dnd-drag-container cm-s-obsidian";
-
-	// copy tab-size from any editor to drag handle - to correctly indent items
-	const cmContent = document.querySelector(
-		".cm-contentContainer .cm-content"
-	);
-	if (cmContent)
-		container.setAttribute("style", cmContent.getAttribute("style"));
-
-	lines.forEach(({ lineDom }) =>
-		container.appendChild(lineDom.cloneNode(true))
-	);
-	drag.appendChild(container);
-	document.body.classList.add("dnd-render-draggable-content");
-	setTimeout(() => {
-		container.classList.add("dnd-drag-container-inactive");
-		document.body.classList.remove("dnd-render-draggable-content");
-	}, 0);
-}
-
 const dragHandle = (line: number, app: App) =>
 	new (class extends GutterMarker {
 		toDOM(editor: EditorView) {
@@ -106,7 +77,6 @@ const dragHandle = (line: number, app: App) =>
 			drag.setAttribute("draggable", "true");
 			drag.addEventListener("dragstart", (e) => {
 				e.dataTransfer.setData("line", `${line}`);
-				copyItemLinesToDragContainer(app, line, drag);
 			});
 			return drag;
 		}
