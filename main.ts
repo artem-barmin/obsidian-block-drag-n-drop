@@ -411,6 +411,8 @@ function highlightWholeItem(app: App, target: Element) {
 			current: buildLineDecorations(currentLines, dragDestination),
 			parent: buildLineDecorations(parentLines, dragParentDestination),
 		};
+
+		editor.dispatch({});
 	} catch (e) {
 		if (
 			e.message.match(
