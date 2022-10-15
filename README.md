@@ -18,7 +18,7 @@
 -   ✅ Automatic reference link generation for dragged block
 -   ✅ Live editor support
 
-# Roadmap
+# No planned
 
 -   [ ] Support for arbitrary block dragging - paragraphs, headings etc
 
