@@ -464,6 +464,10 @@ export default class DragNDropPlugin extends Plugin {
 				if (event.target instanceof HTMLElement) {
 					const line = event.target.closest(".cm-line");
 					processDragOver(line as HTMLElement, event.clientX);
+
+					// @ts-ignore
+					const editor = event.target.cmView.editorView;
+					editor.dispatch({});
 				}
 				event.preventDefault();
 			},
