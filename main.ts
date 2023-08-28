@@ -118,7 +118,6 @@ function getBlock(line: number, fileCache: CachedMetadata) {
 	const block: ListItemCache | SectionCache = _.concat(
 		[],
 		fileCache?.listItems
-		// _.filter(fileCache?.sections, { type: "paragraph" })
 	).find((s) => findSection(s, line));
 	if (!block) return;
 
@@ -163,7 +162,8 @@ function processDrop(
 	app: App,
 	event: DragEvent,
 	settings: DndPluginSettings,
-	dropMode: "current" | "parent"
+	dropMode: "current" | "parent",
+	targetEditor: EditorView
 ) {
 	const sourceLineNum = parseInt(event.dataTransfer.getData("line"), 10);
 	// @ts-ignore
@@ -175,8 +175,6 @@ function processDrop(
 
 	// @ts-ignore
 	const sourceEditor: EditorView = view.editor.cm;
-	// @ts-ignore
-	const targetEditor: EditorView = event.target.cmView.editorView;
 
 	const targetLine = targetEditor.state.doc.lineAt(targetLinePos);
 
@@ -356,11 +354,8 @@ function buildLineDecorations(
 	return builder.finish();
 }
 
-function highlightWholeItem(app: App, target: Element) {
+function highlightWholeItem(app: App, target: Element, editor: EditorView) {
 	try {
-		// @ts-ignore
-		const editor = target.cmView.editorView;
-
 		// get all sub-items for current line
 		const line = DOMtoLine(target.closest(".cm-line"), editor);
 		const currentLines = getAllLinesForCurrentItem(app, line, editor);
@@ -368,13 +363,13 @@ function highlightWholeItem(app: App, target: Element) {
 		// get all sub-items for parent line
 		const currentBlock = getBlockForLine(app, line, editor);
 		const parentLines =
-			currentBlock.parent > 0
+			currentBlock && currentBlock.parent > 0
 				? getAllLinesForCurrentItem(
-						app,
-						currentBlock.parent,
-						editor,
-						line + 1
-				  )
+					app,
+					currentBlock.parent,
+					editor,
+					line + 1
+				)
 				: currentLines;
 
 		lineHightlight = {
@@ -410,7 +405,7 @@ const DEFAULT_SETTINGS: DndPluginSettings = {
 	alt: "none",
 };
 
-const showHighlight = ViewPlugin.fromClass(class {}, {
+const showHighlight = ViewPlugin.fromClass(class { }, {
 	decorations: (v) => {
 		return lineHightlight[highlightMode];
 	},
@@ -430,24 +425,21 @@ export default class DragNDropPlugin extends Plugin {
 		const app = this.app;
 		const settings = await this.loadSettings();
 		const dragEventHandlers = EditorView.domEventHandlers({
-			dragover(event) {
+			dragover(event, editor) {
 				if (event.target instanceof HTMLElement) {
 					const line = event.target.closest(".cm-line");
 					processDragOver(line as HTMLElement, event.clientX);
-
-					// @ts-ignore
-					const editor = event.target.cmView.editorView;
 					editor.dispatch({});
 				}
 				event.preventDefault();
 			},
-			dragenter(event) {
+			dragenter(event, view) {
 				if (event.target instanceof Element)
-					highlightWholeItem(app, event.target);
+					highlightWholeItem(app, event.target, view);
 				event.preventDefault();
 			},
-			drop(event) {
-				processDrop(app, event, settings, highlightMode);
+			drop(event, view) {
+				processDrop(app, event, settings, highlightMode, view);
 				lineHightlight = emptyRange();
 			},
 		});
@@ -492,17 +484,17 @@ class DragNDropSettings extends PluginSettingTab {
 
 		const addDropdownVariants =
 			(settingName: keyof DndPluginSettings) =>
-			(dropDown: DropdownComponent) => {
-				dropDown.addOption("none", "Do nothing");
-				dropDown.addOption("embed", "Embed link");
-				dropDown.addOption("copy", "Copy block");
-				dropDown.addOption("move", "Move block");
-				dropDown.setValue(this.plugin.settings[settingName]);
-				dropDown.onChange(async (value: OperationType) => {
-					this.plugin.settings[settingName] = value;
-					await this.plugin.saveSettings();
-				});
-			};
+				(dropDown: DropdownComponent) => {
+					dropDown.addOption("none", "Do nothing");
+					dropDown.addOption("embed", "Embed link");
+					dropDown.addOption("copy", "Copy block");
+					dropDown.addOption("move", "Move block");
+					dropDown.setValue(this.plugin.settings[settingName]);
+					dropDown.onChange(async (value: OperationType) => {
+						this.plugin.settings[settingName] = value;
+						await this.plugin.saveSettings();
+					});
+				};
 
 		new Setting(containerEl)
 			.setName("Drag'n'drop without modifiers in the same pane")
